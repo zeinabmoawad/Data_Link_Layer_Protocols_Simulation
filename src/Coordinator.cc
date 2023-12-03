@@ -14,12 +14,45 @@
 // 
 
 #include "Coordinator.h"
-
+#include <string>
+#include <fstream>
 Define_Module(Coordinator);
 
 void Coordinator::initialize()
 {
     // TODO - Generated method body
+
+    // read text file to get starting node and starting time
+
+    // Open the file
+    std::ifstream inputFile("../coordinator.txt");
+
+    // Check if the file is opened successfully
+    if (!inputFile.is_open()) {
+        std::cerr << "Unable to open the file." << std::endl;
+        return ; // Return an error code
+    }
+    std::string word;
+    inputFile >> word;
+    nodeStarting = atoi(word.c_str());
+    inputFile >> word;
+    startingTime = atoi(word.c_str());
+
+
+
+    // send information to Nodes
+    std::string msgStr = "";
+    msgStr +=  std::to_string(nodeStarting);
+    msgStr += " ";
+    msgStr +=  std::to_string(startingTime);
+
+    cMessage *msgToSend1 = new cMessage(msgStr.c_str());
+    cMessage *msgToSend2 = new cMessage(msgStr.c_str());
+    send(msgToSend1, "out0");
+    send(msgToSend2, "out1");
+
+
+
 }
 
 void Coordinator::handleMessage(cMessage *msg)

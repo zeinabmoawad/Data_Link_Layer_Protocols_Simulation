@@ -14,15 +14,51 @@
 // 
 
 #include "Node.h"
+#include <string>
+#include <fstream>
 
 Define_Module(Node);
 
 void Node::initialize()
 {
     // TODO - Generated method body
+
+    // print network parameters
+    WS = getParentModule()->par("WS");
+    TO = getParentModule()->par("TO");
+    PT = getParentModule()->par("PT");
+    TD = getParentModule()->par("TD");
+    ED = getParentModule()->par("ED");
+    DD = getParentModule()->par("DD");
+    LP = getParentModule()->par("LP");
+
+    EV << "WS = " << WS <<endl;
+    EV << "TO = " << TO <<endl;
+    EV << "PT = " << PT <<endl;
+    EV << "LP = " << LP <<endl;
+    EV << "TD = " << TD <<endl;
+    EV << "ED = " << ED <<endl;
+    EV << "DD = " << DD <<endl;
+
+
+
 }
 
 void Node::handleMessage(cMessage *msg)
 {
     // TODO - Generated method body
+    EV << msg->getName() << endl;
+    EV << "index: "<< getIndex() << endl;
+
+    int senderID = msg->getSenderModuleId();
+    // check if coordinator ssending
+    if (senderID ==2)
+    {
+        // coordinator sending
+        EV << "coordinator sending "<<endl;
+
+        int nodeNumber = getIndex();
+
+    }
+
 }

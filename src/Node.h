@@ -25,9 +25,18 @@ using namespace omnetpp;
  */
 class Node : public cSimpleModule
 {
-  protected:
-    virtual void initialize();
-    virtual void handleMessage(cMessage *msg);
+  // define data members of node
+    public:
+        int WS = 0;
+        double TO = 0;
+        double PT = 0;
+        double TD = 0;
+        double ED = 0;
+        double DD = 0;
+        double LP = 0;
+    protected:
+        virtual void initialize();
+        virtual void handleMessage(cMessage *msg);
 };
 
 #endif
