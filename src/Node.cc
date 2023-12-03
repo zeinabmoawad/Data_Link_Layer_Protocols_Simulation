@@ -56,26 +56,7 @@ void Node::handleMessage(cMessage *msg)
         if(isSending)
         {
             file = openFile("../input" + std::to_string(getIndex()) + ".txt");
-            std::pair<std::string, std::string> line = readNextLine(file);
-            std::string identifier = line.first;
-            std::string payload = line.second;
-            if (identifier.empty() && payload.empty())
-            {
-                EV << "File reading is done is done";
-            }
-            else
-            {
-                EV << identifier << endl;
-                EV << payload << endl;
-                myBuffer[currentWindowIndex] = line;
-                std::string frame = Framing(payload);
-                EV << frame;
-                std::bitset<8> parity_byte = Checksum(frame);
-                char trailer = static_cast<char>(parity_byte.to_ulong());
-                mmsg->setTrailer(trailer);
-                // Switch cases on identifier
-                checkCases(identifier,mmsg);
-            }
+            scheduleAt(simTime()+startTime,msg);
         }
 
     }
@@ -83,6 +64,7 @@ void Node::handleMessage(cMessage *msg)
     else if(isSending)
     {
         // sending
+        EV << "Node "<< getIndex() << " is sender"<<endl;
         std::pair<std::string, std::string> line = readNextLine(file);
         std::string identifier = line.first;
         std::string payload = line.second;
