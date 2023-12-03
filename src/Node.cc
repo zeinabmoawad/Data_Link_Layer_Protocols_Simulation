@@ -113,6 +113,8 @@ void Node::handleMessage(cMessage *msg)
                 handleACK(mmsg);
             }
 
+
+
         }
 
     }
@@ -363,4 +365,22 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
         default: break;
     }
 
+}
+
+void logStates(std::string logs)
+{
+    // Open the file in append mode
+        std::ofstream outputFile("output.txt", std::ios::app);
+
+        // Check if the file is successfully opened
+        if (!outputFile.is_open()) {
+            std::cerr << "Error opening the file!" << std::endl;
+        }
+
+        outputFile << logs << std::endl;
+
+        // Close the file
+        outputFile.close();
+
+        std::cout << "String appended to the file successfully." << std::endl;
 }
