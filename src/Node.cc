@@ -51,30 +51,6 @@ void Node::handleMessage(cMessage *msg)
 {
     // TODO - Generated method body
     MyCustomMsg_Base *mmsg = check_and_cast<MyCustomMsg_Base *>(msg);
-    int senderID = mmsg->getSenderModuleId();
-    // check if coordinator ssending
-    if (senderID ==2)
-    {
-        // coordinator sending
-        EV << "coordinator sending "<<endl;
-        int nodeSending = mmsg->getAck_Nack_Num();
-        if(nodeSending == getIndex())
-        {
-            // sender
-            isSending = true;
-            startTime = atoi(mmsg->getPayload());
-            EV << "Node "<< getIndex() << " is sender"<<endl;
-            EV << "sending at time: "<<startTime<<endl;
-
-            // set parameter of sender;
-        }
-        else
-        {
-            isSending = false;
-            EV << "Node "<< getIndex() << " is receiver"<<endl;
-            // set parameter of receiver
-            WS = 1;
-        }
-    }
+    checkCoordinator(mmsg);
 
 }

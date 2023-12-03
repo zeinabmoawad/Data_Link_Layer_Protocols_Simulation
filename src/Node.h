@@ -17,6 +17,7 @@
 #define __NETWORK_PROJECR_NODE_H_
 
 #include <omnetpp.h>
+#include "MyCustomMsg_m.h"
 
 using namespace omnetpp;
 
@@ -46,7 +47,7 @@ class Node : public cSimpleModule
         virtual void handleMessage(cMessage *msg);
         void incrementSequenceNo()
         {
-            if (currentWindowIndex+1 > ws)
+            if (currentWindowIndex+1 > WS)
             {
                 currentWindowIndex =0;
             }
@@ -54,6 +55,18 @@ class Node : public cSimpleModule
             {
                 currentWindowIndex++;
             }
+        }
+        int incrementWindowNo(int number)
+        {
+            if (number+1 > WS)
+            {
+                number = 0;
+            }
+            else
+            {
+                number++;
+            }
+            return number;
         }
         bool checkSeqBetween(int start,int end,int seq)
         {
@@ -66,6 +79,37 @@ class Node : public cSimpleModule
             {
                 return false;
             }
+        }
+        bool checkCoordinator(MyCustomMsg_Base* msg)
+        {
+            int senderID = msg->getSenderModuleId();
+            // check if coordinator ssending
+            if (senderID ==2)
+            {
+                // coordinator sending
+                EV << "coordinator sending "<<endl;
+                int nodeSending = msg->getAck_Nack_Num();
+                if(nodeSending == getIndex())
+                {
+                    // sender
+                    isSending = true;
+                    startTime = atoi(msg->getPayload());
+                    EV << "Node "<< getIndex() << " is sender"<<endl;
+                    EV << "sending at time: "<<startTime<<endl;
+
+                    // set parameter of sender;
+                }
+                else
+                {
+                    isSending = false;
+                    EV << "Node "<< getIndex() << " is receiver"<<endl;
+                    // set parameter of receiver
+                    WS = 1;
+
+                }
+                return true;
+            }
+            return false;
         }
 };
 
