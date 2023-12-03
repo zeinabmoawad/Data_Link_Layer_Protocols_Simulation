@@ -13,21 +13,14 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-#include "Node.h"
-#include "MyCustomMsg_m.h"
-Define_Module(Node);
-
-void Node::initialize()
-{
-    // TODO - Generated method body
-    MyCustomMsg_Base*mmsg = new MyCustomMsg_Base();
-    mmsg->setFrame_Type(1);
-    send(mmsg,"out");
-}
-
-void Node::handleMessage(cMessage *msg)
-{
-    // TODO - Generated method body
-    MyCustomMsg_Base*mmsg = check_and_cast<MyCustomMsg_Base*>(msg);
-    EV << mmsg->getFrame_Type();
+//
+// TODO generated message class
+//
+packet MyCustomMsg {
+    @customize(true);  // see the generated C++ header for more info
+    char Header;
+    string Payload;
+    char Trailer;
+    int Frame_Type;
+    int Ack_Nack_Num;
 }
