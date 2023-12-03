@@ -44,14 +44,11 @@ class Node : public cSimpleModule
         int startWindowIndex = 0;
         int endWindowIndex = 0;
         int currentWindowIndex =0;
-        bool isOpen = false;
         std::ifstream file;
 
         // receiver parameters
         int seqNumToReceive = 0;
 
-        // receiver parameters
-        int seqNumToReceive = 0;
 
     protected:
         virtual void initialize();

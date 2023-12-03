@@ -49,13 +49,19 @@ void Node::handleMessage(cMessage *msg)
     // TODO - Generated method body
     MyCustomMsg_Base *mmsg = check_and_cast<MyCustomMsg_Base *>(msg);
     bool isCoordinator =checkCoordinator(mmsg);
-    if (isSending)
+    if (isCoordinator)
     {
-        if (!isOpen)
+        // start sending if sender else do nothing
+        if(isSending)
         {
             file = openFile("../input" + std::to_string(getIndex()) + ".txt");
-            isOpen = true;
         }
+
+    }
+    // check i am sender or receive
+    else if(isSending)
+    {
+        // sending
         std::pair<std::string, std::string> line = readNextLine(file);
         std::string identifier = line.first;
         std::string payload = line.second;
@@ -72,7 +78,8 @@ void Node::handleMessage(cMessage *msg)
     }
     else
     {
-        // reciever
+        // receiving from sender message
+
     }
 }
 
@@ -102,31 +109,11 @@ std::pair<std::string, std::string> Node::readNextLine(std::ifstream & file)
     {
         return std::make_pair("", "");
     }
-    if (isCoordinator)
-    {
-        // start sending if sender else do nothing
-        if(isSending)
-        {
 
-
-        }
-
-    }
-    // check i am sender or receive
-    else if(isSending)
-    {
-        // sending
-
-    }
-    else
-    {
-        // receiving from sender message
-
-    }
 }
 
 
-void receivePacket(MyCustomMsg_Base* msg)
+void Node::receivePacket(MyCustomMsg_Base* msg)
 {
     // check if seq no is expected to have
     // if true check message if there is error
