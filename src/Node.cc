@@ -99,7 +99,6 @@ void Node::handleMessage(cMessage *msg)
             // Switch cases on identifier
             }
 
-
     }
     else
     {
@@ -149,7 +148,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
     {
         // receiving from sender message
         std::string frame = msg->getPayload(); // message.getpayload
-        char trailer; // message.gettrailer
+        char trailer = msg->getTrailer(); // message.gettrailer
         bool errored_frame = ErrorDetection(frame, trailer);
         if (errored_frame)
         {
@@ -238,3 +237,10 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 {
     return Checksum(frame) == std::bitset<8>(parity_byte);
 }
+bool Node::timeOutHandling(MyCustomMsg_Base* msg)
+{
+    // resend all messages from start window to current index
+    // resend firsr message with free error then other in no error
+}
+
+
