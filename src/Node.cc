@@ -165,16 +165,19 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
         if (errored_frame)
         {
             // send Nack to sender with same header with probability LP
-            msg->setAck_Nack_Num(0);
+            msg->setAck_Nack_Num(seqNumToReceive);
+            msg->setFrame_Type(0);
             send(msg,"out");
-
+            EV << "Receiver: error in frame no"<< seqNumToReceive<<endl;
         }
         else
         {
-            std::string payload = Deframing(frame);
-            msg->setAck_Nack_Num(1);
-            send(msg,"out");
             seqNumToReceive = incrementWindowNo(seqNumToReceive);
+            std::string payload = Deframing(frame);
+            msg->setFrame_Type(1);
+            msg->setAck_Nack_Num(seqNumToReceive);
+            send(msg,"out");
+            EV << "Receiver: message received "<< payload<<endl;
             // print payload
 
         }
