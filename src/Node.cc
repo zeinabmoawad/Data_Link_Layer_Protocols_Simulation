@@ -70,6 +70,7 @@ void Node::handleMessage(cMessage *msg)
                 EV << frame;
                 std::bitset<8> parity_byte = Checksum(frame);
                 char trailer = static_cast<char>(parity_byte.to_ulong());
+                mmsg->setTrailer(trailer);
                 // Switch cases on identifier
             }
         }
@@ -94,6 +95,7 @@ void Node::handleMessage(cMessage *msg)
             EV << frame;
             std::bitset<8> parity_byte = Checksum(frame);
             char trailer = static_cast<char>(parity_byte.to_ulong());
+            mmsg->setTrailer(trailer);
             // Switch cases on identifier
             }
 
