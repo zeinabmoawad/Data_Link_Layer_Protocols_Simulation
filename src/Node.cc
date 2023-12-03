@@ -51,6 +51,50 @@ void Node::handleMessage(cMessage *msg)
 {
     // TODO - Generated method body
     MyCustomMsg_Base *mmsg = check_and_cast<MyCustomMsg_Base *>(msg);
-    checkCoordinator(mmsg);
+    bool isCoordinator =checkCoordinator(mmsg);
 
+    if (isCoordinator)
+    {
+        // start sending if sender else do nothing
+        if(isSending)
+        {
+
+
+        }
+
+    }
+    // check i am sender or receive
+    else if(isSending)
+    {
+        // sending
+
+    }
+    else
+    {
+        // receiving from sender message
+
+    }
+}
+
+
+void receivePacket(MyCustomMsg_Base* msg)
+{
+    // check if seq no is expected to have
+    // if true check message if there is error
+    //      if error then send Nack
+    //      else send ack
+    // else do not respond with message
+    if (seqNumToReceive == msg->getHeader())
+    {
+        // check for error, call detection
+
+        bool errorDetected = true;
+        if (errorDetected)
+        {
+            // send Nack to sender
+
+        }
+
+
+    }
 }

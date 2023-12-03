@@ -36,15 +36,20 @@ class Node : public cSimpleModule
         double DD = 0;
         double LP = 0;
         bool isSending = false;
-        double startTime = 0;
 
+        // sender parameters
+        double startTime = 0;
         int startWindowIndex = 0;
         int endWindowIndex = 0;
         int currentWindowIndex =0;
 
+        // receiver parameters
+        int seqNumToReceive = 0;
+
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
+        void receivePacket(MyCustomMsg_Base* msg);
         void incrementSequenceNo()
         {
             if (currentWindowIndex+1 > WS)
