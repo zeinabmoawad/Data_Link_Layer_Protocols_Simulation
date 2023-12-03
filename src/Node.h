@@ -36,9 +36,37 @@ class Node : public cSimpleModule
         double LP = 0;
         bool isSending = false;
         double startTime = 0;
+
+        int startWindowIndex = 0;
+        int endWindowIndex = 0;
+        int currentWindowIndex =0;
+
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
+        void incrementSequenceNo()
+        {
+            if (currentWindowIndex+1 > ws)
+            {
+                currentWindowIndex =0;
+            }
+            else
+            {
+                currentWindowIndex++;
+            }
+        }
+        bool checkSeqBetween(int start,int end,int seq)
+        {
+            if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq))
+                    || ((seq < end )&& (end < start))  )
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
 };
 
 #endif

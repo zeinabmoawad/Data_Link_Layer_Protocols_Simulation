@@ -70,11 +70,10 @@ void Node::handleMessage(cMessage *msg)
         }
         else
         {
-
             isSending = false;
             EV << "Node "<< getIndex() << " is receiver"<<endl;
             // set parameter of receiver
-
+            WS = 1;
         }
     }
 
