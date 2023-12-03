@@ -34,6 +34,8 @@ class Node : public cSimpleModule
         double ED = 0;
         double DD = 0;
         double LP = 0;
+        bool isSending = false;
+        double startTime = 0;
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);

@@ -16,6 +16,8 @@
 #include "Coordinator.h"
 #include <string>
 #include <fstream>
+
+#include "MyCustomMsg_m.h"
 Define_Module(Coordinator);
 
 void Coordinator::initialize()
@@ -41,13 +43,13 @@ void Coordinator::initialize()
 
 
     // send information to Nodes
-    std::string msgStr = "";
-    msgStr +=  std::to_string(nodeStarting);
-    msgStr += " ";
-    msgStr +=  std::to_string(startingTime);
-
-    cMessage *msgToSend1 = new cMessage(msgStr.c_str());
-    cMessage *msgToSend2 = new cMessage(msgStr.c_str());
+    std::string msgStr = std::to_string(startingTime);
+    MyCustomMsg_Base *msgToSend1 = new MyCustomMsg_Base();
+    MyCustomMsg_Base *msgToSend2 = new MyCustomMsg_Base();
+    msgToSend1->setAck_Nack_Num(nodeStarting);
+    msgToSend2->setAck_Nack_Num(nodeStarting);
+    msgToSend1->setPayload(msgStr.c_str());
+    msgToSend2->setPayload(msgStr.c_str());
     send(msgToSend1, "out0");
     send(msgToSend2, "out1");
 
