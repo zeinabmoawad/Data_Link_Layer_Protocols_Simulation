@@ -67,7 +67,7 @@ class Node : public cSimpleModule
         std::pair<std::string, std::string> readNextLine(std::ifstream& file);
         void receivePacket(MyCustomMsg_Base* msg);
         void timeOutHandling();
-        void checkCases(const std::string& cases,MyCustomMsg_Base* msg);
+        void checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::string frame);
         void incrementSequenceNo()
         {
             if (currentWindowIndex+1 > WS)

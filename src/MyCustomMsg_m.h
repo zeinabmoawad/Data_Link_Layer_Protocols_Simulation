@@ -27,7 +27,7 @@
  * packet MyCustomMsg
  * {
  *     \@customize(true);  // see the generated C++ header for more info
- *     char Header;
+ *     int Header;
  *     string Payload;
  *     char Trailer;
  *     int Frame_Type;
@@ -62,7 +62,7 @@
 class MyCustomMsg_Base : public ::omnetpp::cPacket
 {
   protected:
-    char Header;
+    int Header;
     ::omnetpp::opp_string Payload;
     char Trailer;
     int Frame_Type;
@@ -83,14 +83,14 @@ class MyCustomMsg_Base : public ::omnetpp::cPacket
   public:
     MyCustomMsg_Base(const char *name=nullptr, short kind=0);
     virtual ~MyCustomMsg_Base();
-    virtual MyCustomMsg_Base *dup()  const override {
+    virtual MyCustomMsg_Base *dup() const override {
         return new MyCustomMsg_Base(*this);}
     virtual void parsimPack(omnetpp::cCommBuffer *b) const override;
     virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
 
     // field getter/setter methods
-    virtual char getHeader() const;
-    virtual void setHeader(char Header);
+    virtual int getHeader() const;
+    virtual void setHeader(int Header);
     virtual const char * getPayload() const;
     virtual void setPayload(const char * Payload);
     virtual char getTrailer() const;

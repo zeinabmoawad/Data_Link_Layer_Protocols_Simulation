@@ -18,7 +18,7 @@
 //
 packet MyCustomMsg {
     @customize(true);  // see the generated C++ header for more info
-    char Header;
+    int Header;
     string Payload;
     char Trailer;
     int Frame_Type;

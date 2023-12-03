@@ -231,12 +231,12 @@ void MyCustomMsg_Base::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->Ack_Nack_Num);
 }
 
-char MyCustomMsg_Base::getHeader() const
+int MyCustomMsg_Base::getHeader() const
 {
     return this->Header;
 }
 
-void MyCustomMsg_Base::setHeader(char Header)
+void MyCustomMsg_Base::setHeader(int Header)
 {
     this->Header = Header;
 }
@@ -407,7 +407,7 @@ const char *MyCustomMsgDescriptor::getFieldTypeString(int field) const
         field -= basedesc->getFieldCount();
     }
     static const char *fieldTypeStrings[] = {
-        "char",
+        "int",
         "string",
         "char",
         "int",

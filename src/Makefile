@@ -1,12 +1,12 @@
 #
-# OMNeT++/OMNEST Makefile for network_projecr
+# OMNeT++/OMNEST Makefile for Data_Link_Layer_Protocols_Simulation
 #
 # This file was generated with the command:
 #  opp_makemake -f --deep
 #
 
 # Name of target to be created (-o option)
-TARGET = network_projecr$(D)$(EXE_SUFFIX)
+TARGET = Data_Link_Layer_Protocols_Simulation$(D)$(EXE_SUFFIX)
 TARGET_DIR = .
 
 # User interface (uncomment one) (-u option)
