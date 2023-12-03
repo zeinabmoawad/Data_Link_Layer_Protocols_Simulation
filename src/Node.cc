@@ -124,7 +124,7 @@ void Node::handleMessage(cMessage *msg)
         receivePacket(mmsg);
     }
 }
-void handleACK(MyCustomMsg_Base* msg)
+void Node::handleACK(MyCustomMsg_Base* msg)
 {
     startWindowIndex = incrementWindowNo(msg->getHeader());
 }
@@ -178,17 +178,27 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
             msg->setFrame_Type(0);
             send(msg,"out");
             EV << "Receiver: error in frame no"<< seqNumToReceive<<endl;
+            std::string logs = "At time["+std::to_string(PT) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
+                                          std::to_string(seqNumToReceive)+"] , loss [Yes]";
+            logStates(logs);
         }
         else
         {
+            int previousSeqNum  = seqNumToReceive;
             seqNumToReceive = incrementWindowNo(seqNumToReceive);
             std::string payload = Deframing(frame);
             msg->setFrame_Type(1);
             msg->setAck_Nack_Num(seqNumToReceive);
             send(msg,"out");
             EV << "Receiver: message received "<< payload<<endl;
-            // print payload
 
+            // print payload
+            std::string logs = "At time["+std::to_string(PT) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
+                                                      std::to_string(seqNumToReceive)+"] , loss [Yes]";
+            logStates(logs);
+            // print payload
+            logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
+            logStates(logs);
         }
 
 
@@ -367,7 +377,7 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
 
 }
 
-void logStates(std::string logs)
+void Node::logStates(std::string logs)
 {
     // Open the file in append mode
         std::ofstream outputFile("output.txt", std::ios::app);

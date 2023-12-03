@@ -68,6 +68,8 @@ class Node : public cSimpleModule
         void receivePacket(MyCustomMsg_Base* msg);
         void timeOutHandling();
         void checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::string frame);
+        void logStates(std::string logs);
+        void handleACK(MyCustomMsg_Base* msg);
         void incrementSequenceNo()
         {
             if (currentWindowIndex+1 > WS)
