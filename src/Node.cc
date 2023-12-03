@@ -246,7 +246,32 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 void Node::timeOutHandling(MyCustomMsg_Base* msg)
 {
     // resend all messages from start window to current index
-    // resend firsr message with free error then other in no error
+    // resend first message with free error then other in no error
+    MyCustomMsg_Base* msgToSend = new MyCustomMsg_Base();
+
+    msgToSend->setHeader(startWindowIndex);
+    std::string frame = Framing(myBuffer[startWindowIndex].second);
+    std::bitset<8> parity_byte = Checksum(frame);
+    char trailer = static_cast<char>(parity_byte.to_ulong());
+    msgToSend->setTrailer(trailer);
+    msgToSend->setPayload(frame.c_str());
+    checkCases("0000",msgToSend);
+
+    int index = incrementWindowNo(startWindowIndex);
+    while(index!=currentWindowIndex)
+    {
+        MyCustomMsg_Base* msgToSend = new MyCustomMsg_Base();
+
+        msgToSend->setHeader(startWindowIndex);
+        std::string frame = Framing(myBuffer[startWindowIndex].second);
+        std::bitset<8> parity_byte = Checksum(frame);
+        char trailer = static_cast<char>(parity_byte.to_ulong());
+        msgToSend->setTrailer(trailer);
+        msgToSend->setPayload(frame.c_str());
+        checkCases(myBuffer[index].first,msgToSend);
+        index = incrementWindowNo(index);
+    }
+
 }
 
 
