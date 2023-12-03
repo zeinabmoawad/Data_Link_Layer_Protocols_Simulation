@@ -55,6 +55,18 @@ void Node::handleMessage(cMessage *msg)
         if(isSending)
         {
             file = openFile("../input" + std::to_string(getIndex()) + ".txt");
+            std::pair<std::string, std::string> line = readNextLine(file);
+            std::string identifier = line.first;
+            std::string payload = line.second;
+            if (identifier.empty() && payload.empty())
+            {
+                EV << "File reading is done is done";
+            }
+            else
+            {
+                EV << identifier << endl;
+                EV << payload << endl;
+            }
         }
 
     }
