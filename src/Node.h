@@ -18,6 +18,8 @@
 
 #include <omnetpp.h>
 #include "MyCustomMsg_m.h"
+#include <string>
+#include <fstream>
 
 using namespace omnetpp;
 
@@ -42,6 +44,11 @@ class Node : public cSimpleModule
         int startWindowIndex = 0;
         int endWindowIndex = 0;
         int currentWindowIndex =0;
+        bool isOpen = false;
+        std::ifstream file;
+
+        // receiver parameters
+        int seqNumToReceive = 0;
 
         // receiver parameters
         int seqNumToReceive = 0;
@@ -49,6 +56,8 @@ class Node : public cSimpleModule
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
+        std::ifstream openFile(const std::string& fileName);
+        std::pair<std::string, std::string> readNextLine(std::ifstream& file);
         void receivePacket(MyCustomMsg_Base* msg);
         void incrementSequenceNo()
         {
