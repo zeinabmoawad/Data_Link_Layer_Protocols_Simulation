@@ -72,7 +72,7 @@ void Node::handleMessage(cMessage *msg)
                 char trailer = static_cast<char>(parity_byte.to_ulong());
                 mmsg->setTrailer(trailer);
                 // Switch cases on identifier
-                checkCases(identifier,mmsg);
+                checkCases(identifier,mmsg,frame);
             }
         }
 
@@ -173,7 +173,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
 
     }
 }
-std::vector<std::bitset<8> > Node::Modification(std::string message)
+std::string Node::Modification(std::string message)
 {
     int message_length = message.size();
     std::vector<std::bitset<8> >message_bit_stream;
@@ -187,11 +187,13 @@ std::vector<std::bitset<8> > Node::Modification(std::string message)
     int errorChar = errorBit/8;
     message_bit_stream[errorChar][errorBit%8] = !message_bit_stream[errorChar][errorBit%8];
     std::cout<<"Error in " << "char: " <<errorChar << " in bit: " << errorBit%8 <<endl;
+    std::string errored_message = "";
     for(std::vector<std::bitset<8> >::iterator it = message_bit_stream.begin(); it != message_bit_stream.end(); ++it)
     {
-        std::cout<<*it<<endl;
+        errored_message +=(char)(*it).to_ulong();
     }
-    return message_bit_stream;
+
+    return errored_message;
 }
 std::string Node::Framing(std::string message)
 {
@@ -242,30 +244,79 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
     return Checksum(frame) == std::bitset<8>(parity_byte);
 }
 
-void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg)
+void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::string frame)
 {
     unsigned int inputValue = std::bitset<4>(identifier).to_ulong();
 
     // Switch-case logic based on the input value
     switch (inputValue) {
-        case 0b0000: break;
-        case 0b0001:
-
+        case 0b0000:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            sendDelayed(msg, simTime()+PT+TD,out);
             break;
-        case 0b0010: break;
-        case 0b0011: break;
-        case 0b0100: break;
-        case 0b0101: break;
-        case 0b0110: break;
-        case 0b0111: break;
-        case 0b1000: break;
-        case 0b1001: break;
-        case 0b1010: break;
-        case 0b1011: break;
-        case 0b1100: break;
-        case 0b1101: break;
-        case 0b1110: break;
-        case 0b1111: break;
+        case 0b0001:
+            msg->setPayload(Payload.c_str());
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            sendDelayed(msg, simTime()+PT+TD+ED, out);
+            break;
+        case 0b0010:
+            msg->setPayload(Payload.c_str());
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            sendDelayed(msg, simTime()+PT+TD, out);
+            sendDelayed(msg, simTime()+PT+TD+DD, out);
+            break;
+        case 0b0011:
+            msg->setPayload(Payload.c_str());
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            sendDelayed(msg, simTime()+PT+TD+ED, out);
+            sendDelayed(msg, simTime()+PT+TD+DD+ED, out);
+            break;
+        case 0b0100: // loss
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b0101:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b0110:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b0111:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b1000:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            modified_frame = Modification(frame);
+            sendDelayed(msg, simTime()+PT+TD, out);
+            break;
+        case 0b1001:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            modified_frame = Modification(frame);
+            sendDelayed(msg, simTime()+PT+TD+ED, out);
+            break;
+        case 0b1010:
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            modified_frame = Modification(frame);
+            sendDelayed(msg, simTime()+PT+TD, out);
+            sendDelayed(msg, simTime()+PT+TD+DD, out);
+            break;
+        case 0b1011: // Mod, dup,delay
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            modified_frame = Modification(frame);
+            sendDelayed(msg, simTime()+PT+TD+ED, out);
+            sendDelayed(msg, simTime()+PT+TD+DD+ED, out);
+            break;
+        case 0b1100: // loss, mod
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b1101: // loss, mod, delay
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b1110: // loss, mod, dup
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
+        case 0b1111: // loss, mod, dup, delay
+            scheduleAt(simTime()+PT,new cMessage("self message"));
+            break;
         default: break;
     }
 

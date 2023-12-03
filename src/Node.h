@@ -56,7 +56,7 @@ class Node : public cSimpleModule
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
-        std::vector<std::bitset<8> > Modification(std::string message);
+        std::string Modification(std::string message);
         std::string Framing(std::string message);
         std::bitset<8> Checksum(std::string frame);
         std::string Deframing(std::string frame);
