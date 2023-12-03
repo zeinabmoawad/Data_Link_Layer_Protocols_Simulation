@@ -20,6 +20,9 @@
 #include "MyCustomMsg_m.h"
 #include <string>
 #include <fstream>
+#include <vector>
+#include <bitset>
+
 
 using namespace omnetpp;
 
@@ -53,6 +56,11 @@ class Node : public cSimpleModule
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
+        std::vector<std::bitset<8> > Modification(std::string message);
+        std::string Framing(std::string message);
+        std::bitset<8> Checksum(std::string frame);
+        std::string Deframing(std::string frame);
+        bool ErrorDetection(std::string frame, char parity_byte);
         std::ifstream openFile(const std::string& fileName);
         std::pair<std::string, std::string> readNextLine(std::ifstream& file);
         void receivePacket(MyCustomMsg_Base* msg);
