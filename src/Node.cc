@@ -98,14 +98,11 @@ void Node::handleMessage(cMessage *msg)
             }
 
 
-        }
+    }
     else
     {
         // receiving from sender message
-        std::string frame = mmsg->getPayload(); // message.getpayload
-        char trailer; // message.gettrailer
-        std::string payload = Deframing(frame);
-        bool errored_frame = ErrorDetection(frame, trailer);
+        receivePacket(mmsg);
     }
 }
 
@@ -148,10 +145,11 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
     // else do not respond with message
     if (seqNumToReceive == msg->getHeader())
     {
-        // check for error, call detection
-
-        bool errorDetected = true;
-        if (errorDetected)
+        // receiving from sender message
+        std::string frame = msg->getPayload(); // message.getpayload
+        char trailer; // message.gettrailer
+        bool errored_frame = ErrorDetection(frame, trailer);
+        if (errored_frame)
         {
             // send Nack to sender with same header with probability LP
             msg->setAck_Nack_Num(0);
@@ -160,8 +158,11 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
         }
         else
         {
+            std::string payload = Deframing(frame);
             msg->setAck_Nack_Num(1);
             send(msg,"out");
+            // print payload
+
         }
 
 
