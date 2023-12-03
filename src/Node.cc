@@ -17,11 +17,14 @@
 #include <string>
 #include <fstream>
 
+#include "MyCustomMsg_m.h"
+
 Define_Module(Node);
 
 void Node::initialize()
 {
     // TODO - Generated method body
+
 
     // print network parameters
     WS = getParentModule()->par("WS");
