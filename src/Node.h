@@ -18,6 +18,8 @@
 
 #include <omnetpp.h>
 #include "MyCustomMsg_m.h"
+#include <string>
+#include <fstream>
 
 using namespace omnetpp;
 
@@ -37,14 +39,17 @@ class Node : public cSimpleModule
         double LP = 0;
         bool isSending = false;
         double startTime = 0;
-
         int startWindowIndex = 0;
         int endWindowIndex = 0;
         int currentWindowIndex =0;
+        bool isOpen = false;
+        std::ifstream file;
 
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
+        std::ifstream openFile(const std::string& fileName);
+        std::pair<std::string, std::string> readNextLine(std::ifstream& file);
         void incrementSequenceNo()
         {
             if (currentWindowIndex+1 > WS)
