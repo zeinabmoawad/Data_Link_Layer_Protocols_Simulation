@@ -47,10 +47,12 @@ class Node : public cSimpleModule
         int startWindowIndex = 0;
         int endWindowIndex = 0;
         int currentWindowIndex =0;
+        int bufferIndex = 0;
         std::ifstream file;
 
         // receiver parameters
         int seqNumToReceive = 0;
+        std::pair<std::string, std::string>* myBuffer;
 
 
     protected:

@@ -34,6 +34,7 @@ void Node::initialize()
     ED = getParentModule()->par("ED");
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
+    myBuffer = new std::pair<std::string, std::string>[WS];
 
     EV << "WS = " << WS << endl;
     EV << "TO = " << TO << endl;
@@ -66,6 +67,7 @@ void Node::handleMessage(cMessage *msg)
             {
                 EV << identifier << endl;
                 EV << payload << endl;
+                myBuffer[currentWindowIndex] = line;
                 std::string frame = Framing(payload);
                 EV << frame;
                 std::bitset<8> parity_byte = Checksum(frame);
@@ -92,6 +94,7 @@ void Node::handleMessage(cMessage *msg)
         {
             EV << identifier << endl;
             EV << payload << endl;
+            myBuffer[currentWindowIndex] = line;
             std::string frame = Framing(payload);
             EV << frame;
             std::bitset<8> parity_byte = Checksum(frame);
@@ -100,7 +103,7 @@ void Node::handleMessage(cMessage *msg)
             // Switch cases on identifier
             checkCases(identifier,mmsg);
 
-            }
+          }
 
     }
     else
@@ -240,7 +243,7 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 {
     return Checksum(frame) == std::bitset<8>(parity_byte);
 }
-bool Node::timeOutHandling(MyCustomMsg_Base* msg)
+void Node::timeOutHandling(MyCustomMsg_Base* msg)
 {
     // resend all messages from start window to current index
     // resend firsr message with free error then other in no error
