@@ -47,10 +47,12 @@ class Node : public cSimpleModule
         int startWindowIndex = 0;
         int endWindowIndex = 0;
         int currentWindowIndex =0;
+        int bufferIndex = 0;
         std::ifstream file;
 
         // receiver parameters
         int seqNumToReceive = 0;
+        std::pair<std::string, std::string>* myBuffer;
 
 
     protected:
@@ -64,6 +66,7 @@ class Node : public cSimpleModule
         std::ifstream openFile(const std::string& fileName);
         std::pair<std::string, std::string> readNextLine(std::ifstream& file);
         void receivePacket(MyCustomMsg_Base* msg);
+        void timeOutHandling();
         void checkCases(const std::string& cases,MyCustomMsg_Base* msg);
         void incrementSequenceNo()
         {

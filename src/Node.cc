@@ -34,6 +34,7 @@ void Node::initialize()
     ED = getParentModule()->par("ED");
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
+    myBuffer = new std::pair<std::string, std::string>[WS];
 
     EV << "WS = " << WS << endl;
     EV << "TO = " << TO << endl;
@@ -55,25 +56,8 @@ void Node::handleMessage(cMessage *msg)
         if(isSending)
         {
             file = openFile("../input" + std::to_string(getIndex()) + ".txt");
-            std::pair<std::string, std::string> line = readNextLine(file);
-            std::string identifier = line.first;
-            std::string payload = line.second;
-            if (identifier.empty() && payload.empty())
-            {
-                EV << "File reading is done is done";
-            }
-            else
-            {
-                EV << identifier << endl;
-                EV << payload << endl;
-                std::string frame = Framing(payload);
-                EV << frame;
-                std::bitset<8> parity_byte = Checksum(frame);
-                char trailer = static_cast<char>(parity_byte.to_ulong());
-                mmsg->setTrailer(trailer);
-                // Switch cases on identifier
-                checkCases(identifier,mmsg,frame);
-            }
+            msg->setKind(0);
+            scheduleAt(simTime()+startTime,msg);
         }
 
     }
@@ -81,27 +65,46 @@ void Node::handleMessage(cMessage *msg)
     else if(isSending)
     {
         // sending
-        std::pair<std::string, std::string> line = readNextLine(file);
-        std::string identifier = line.first;
-        std::string payload = line.second;
-        if (identifier.empty() && payload.empty())
+        if(msg->isSelfMessage())
         {
-            EV << "File reading is done is done";
-        }
-        else
-        {
-            EV << identifier << endl;
-            EV << payload << endl;
-            std::string frame = Framing(payload);
-            EV << frame;
-            std::bitset<8> parity_byte = Checksum(frame);
-            char trailer = static_cast<char>(parity_byte.to_ulong());
-            mmsg->setTrailer(trailer);
-            // Switch cases on identifier
-            checkCases(identifier,mmsg);
+            if(msg->getKind() == 0)
+            {
+                EV << "Node "<< getIndex() << " is sender"<<endl;
+                std::pair<std::string, std::string> line = readNextLine(file);
+                std::string identifier = line.first;
+                std::string payload = line.second;
+                if (identifier.empty() && payload.empty())
+                {
+                    EV << "File reading is done is done";
+                }
+                else
+                {
+                    EV << identifier << endl;
+                    EV << payload << endl;
+                    myBuffer[currentWindowIndex] = line;
+                    std::string frame = Framing(payload);
+                    EV << frame;
+                    std::bitset<8> parity_byte = Checksum(frame);
+                    char trailer = static_cast<char>(parity_byte.to_ulong());
+                    mmsg->setTrailer(trailer);
+                    // Switch cases on identifier
+                    checkCases(identifier,mmsg);
 
+                 }
             }
+            else
+            {
+                // time out
+                timeOutHandling();
+                cancelAndDelete(mmsg);
+            }
+            return;
 
+        }
+        else{
+            // Ack/Nack
+
+        }
 
     }
     else
@@ -152,7 +155,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
     {
         // receiving from sender message
         std::string frame = msg->getPayload(); // message.getpayload
-        char trailer; // message.gettrailer
+        char trailer = msg->getTrailer(); // message.gettrailer
         bool errored_frame = ErrorDetection(frame, trailer);
         if (errored_frame)
         {
@@ -243,6 +246,38 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 {
     return Checksum(frame) == std::bitset<8>(parity_byte);
 }
+void Node::timeOutHandling()
+{
+    // resend all messages from start window to current index
+    // resend first message with free error then other in no error
+    MyCustomMsg_Base* msgToSend = new MyCustomMsg_Base();
+
+    msgToSend->setHeader(startWindowIndex);
+    std::string frame = Framing(myBuffer[startWindowIndex].second);
+    std::bitset<8> parity_byte = Checksum(frame);
+    char trailer = static_cast<char>(parity_byte.to_ulong());
+    msgToSend->setTrailer(trailer);
+    msgToSend->setPayload(frame.c_str());
+    checkCases("0000",msgToSend);
+
+    int index = incrementWindowNo(startWindowIndex);
+    while(index!=currentWindowIndex)
+    {
+        MyCustomMsg_Base* msgToSend = new MyCustomMsg_Base();
+
+        msgToSend->setHeader(startWindowIndex);
+        std::string frame = Framing(myBuffer[startWindowIndex].second);
+        std::bitset<8> parity_byte = Checksum(frame);
+        char trailer = static_cast<char>(parity_byte.to_ulong());
+        msgToSend->setTrailer(trailer);
+        msgToSend->setPayload(frame.c_str());
+        checkCases(myBuffer[index].first,msgToSend);
+        index = incrementWindowNo(index);
+    }
+
+}
+
+
 
 void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::string frame)
 {
