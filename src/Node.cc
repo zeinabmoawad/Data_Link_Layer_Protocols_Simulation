@@ -108,6 +108,10 @@ void Node::handleMessage(cMessage *msg)
         }
         else{
             // Ack/Nack
+            if(mmsg->getFrame_Type() == 1)
+            {
+                handleACK(mmsg);
+            }
 
         }
 
@@ -118,7 +122,10 @@ void Node::handleMessage(cMessage *msg)
         receivePacket(mmsg);
     }
 }
-
+void handleACK(MyCustomMsg_Base* msg)
+{
+    startWindowIndex = incrementWindowNo(msg->getHeader());
+}
 std::ifstream Node::openFile(const std::string &fileName)
 {
     std::ifstream file(fileName);
