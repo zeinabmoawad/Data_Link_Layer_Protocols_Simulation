@@ -139,8 +139,15 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
         bool errorDetected = true;
         if (errorDetected)
         {
-            // send Nack to sender
+            // send Nack to sender with same header with probability LP
+            msg->setAck_Nack_Num(0);
+            send(msg,"out");
 
+        }
+        else
+        {
+            msg->setAck_Nack_Num(1);
+            send(msg,"out");
         }
 
 
