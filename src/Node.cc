@@ -72,6 +72,7 @@ void Node::handleMessage(cMessage *msg)
                 char trailer = static_cast<char>(parity_byte.to_ulong());
                 mmsg->setTrailer(trailer);
                 // Switch cases on identifier
+                checkCases(identifier,mmsg);
             }
         }
 
@@ -97,6 +98,8 @@ void Node::handleMessage(cMessage *msg)
             char trailer = static_cast<char>(parity_byte.to_ulong());
             mmsg->setTrailer(trailer);
             // Switch cases on identifier
+            checkCases(identifier,mmsg);
+
             }
 
 
@@ -237,4 +240,33 @@ std::string Node::Deframing(std::string frame)
 bool Node::ErrorDetection(std::string frame, char parity_byte)
 {
     return Checksum(frame) == std::bitset<8>(parity_byte);
+}
+
+void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg)
+{
+    unsigned int inputValue = std::bitset<4>(identifier).to_ulong();
+
+    // Switch-case logic based on the input value
+    switch (inputValue) {
+        case 0b0000: break;
+        case 0b0001:
+
+            break;
+        case 0b0010: break;
+        case 0b0011: break;
+        case 0b0100: break;
+        case 0b0101: break;
+        case 0b0110: break;
+        case 0b0111: break;
+        case 0b1000: break;
+        case 0b1001: break;
+        case 0b1010: break;
+        case 0b1011: break;
+        case 0b1100: break;
+        case 0b1101: break;
+        case 0b1110: break;
+        case 0b1111: break;
+        default: break;
+    }
+
 }
