@@ -66,6 +66,11 @@ void Node::handleMessage(cMessage *msg)
             {
                 EV << identifier << endl;
                 EV << payload << endl;
+                std::string frame = Framing(payload);
+                EV << frame;
+                std::bitset<8> parity_byte = Checksum(frame);
+                char trailer = static_cast<char>(parity_byte.to_ulong());
+                // Switch cases on identifier
             }
         }
 
@@ -85,13 +90,22 @@ void Node::handleMessage(cMessage *msg)
         {
             EV << identifier << endl;
             EV << payload << endl;
-        }
+            std::string frame = Framing(payload);
+            EV << frame;
+            std::bitset<8> parity_byte = Checksum(frame);
+            char trailer = static_cast<char>(parity_byte.to_ulong());
+            // Switch cases on identifier
+            }
 
-    }
+
+        }
     else
     {
         // receiving from sender message
-
+        std::string frame = mmsg->getPayload(); // message.getpayload
+        char trailer; // message.gettrailer
+        std::string payload = Deframing(frame);
+        bool errored_frame = ErrorDetection(frame, trailer);
     }
 }
 
@@ -152,4 +166,72 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
 
 
     }
+}
+std::vector<std::bitset<8> > Node::Modification(std::string message)
+{
+    int message_length = message.size();
+    std::vector<std::bitset<8> >message_bit_stream;
+    for(int i=0; i<message_length;i++)
+    {
+        std::bitset<8> bit_message(message[i]);
+        message_bit_stream.push_back(bit_message);
+        std::cout<<bit_message<<endl;
+    }
+    int errorBit = int(uniform(0, message.size()*8));
+    int errorChar = errorBit/8;
+    message_bit_stream[errorChar][errorBit%8] = !message_bit_stream[errorChar][errorBit%8];
+    std::cout<<"Error in " << "char: " <<errorChar << " in bit: " << errorBit%8 <<endl;
+    for(std::vector<std::bitset<8> >::iterator it = message_bit_stream.begin(); it != message_bit_stream.end(); ++it)
+    {
+        std::cout<<*it<<endl;
+    }
+    return message_bit_stream;
+}
+std::string Node::Framing(std::string message)
+{
+    std::string frame ="";
+    for(int i=0;i<message.size();i++)
+    {
+        if(message[i] == '\\' || message[i] == '$')
+        {
+           frame += '\\';
+        }
+        frame += message[i];
+    }
+    frame = "$" + frame + "$";
+    return frame;
+}
+std::bitset<8> Node::Checksum(std::string frame)
+{
+    int checksum = 0;
+    int frame_int;
+    for(int i=0;i<frame.size();i++)
+    {
+        std::bitset<8> frame_byte(frame[i]);
+        frame_int = (frame_byte).to_ulong();
+        checksum += frame_int;
+        if(checksum > 255)
+        {
+            checksum = checksum - 256 + 1;
+        }
+    }
+    std::bitset<8> checksum_bit_stream(checksum);
+    return ~checksum_bit_stream;
+}
+std::string Node::Deframing(std::string frame)
+{
+    std::string payload;
+    for(int i=1;i<frame.size()-1;i++)
+    {
+        if(frame[i] == '\\')
+        {
+            i++;
+        }
+        payload += frame[i];
+    }
+    return payload;
+}
+bool Node::ErrorDetection(std::string frame, char parity_byte)
+{
+    return Checksum(frame) == std::bitset<8>(parity_byte);
 }
