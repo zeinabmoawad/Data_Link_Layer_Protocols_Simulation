@@ -35,7 +35,7 @@ void Node::initialize()
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
     myBuffer = new std::pair<std::string, std::string>[WS+1];
-    Timers = new MyCustomMsg_Base[WS+1];
+    Timers.resize(WS+1);
     endWindowIndex = WS-1;
 
     EV << "WS = " << WS << endl;
@@ -52,6 +52,8 @@ void Node::handleMessage(cMessage *msg)
     // TODO - Generated method body
     MyCustomMsg_Base *mmsg = check_and_cast<MyCustomMsg_Base *>(msg);
     bool isCoordinator =checkCoordinator(mmsg);
+    std::string identifier;
+    std::string payload;
     if (isCoordinator)
     {
         // start sending if sender else do nothing
@@ -73,8 +75,8 @@ void Node::handleMessage(cMessage *msg)
             {
                 EV << "Node "<< getIndex() << " is sender"<<endl;
                 std::pair<std::string, std::string> line = readNextLine(file);
-                std::string identifier = line.first;
-                std::string payload = line.second;
+                identifier = line.first;
+                payload = line.second;
                 if (identifier.empty() && payload.empty())
                 {
                     EV << "File reading is done is done";
@@ -93,10 +95,11 @@ void Node::handleMessage(cMessage *msg)
                     mmsg->setTrailer(trailer);
                     // Switch cases on identifier
                     checkCases(identifier,mmsg,frame);
-                    MyCustomMsg_Base* timeOutMsg = new MyCustomMsg_Base("time out");
-                    timeOutMsg->setKind(1);
-                    scheduleAt(simTime()+PT+TO,timeOutMsg);
-                    Timers[currentWindowIndex] = timeOutMsg;
+//                    MyCustomMsg_Base* timeOutMsg = new MyCustomMsg_Base("time out");
+                    Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
+                    Timers[currentWindowIndex]->setKind(1);
+                    scheduleAt(simTime()+PT+TO,Timers[currentWindowIndex]);
+                    incrementSequenceNo();
                  }
             }
             else if(msg->getKind() == 1)
@@ -106,9 +109,43 @@ void Node::handleMessage(cMessage *msg)
                 cancelAndDelete(mmsg);
 
             }
-            else
+            else if(msg->getKind() == 2)
             {
-               scheduleAt(simTime(),"Buffer is full");
+                 payload = myBuffer[currentWindowIndex].second;
+                 identifier = myBuffer[currentWindowIndex].first;
+                 mmsg->setHeader(currentWindowIndex);
+                 EV << identifier << endl;
+                 EV << payload << endl;
+                 std::string frame = Framing(payload);
+                 EV << frame;
+                 std::bitset<8> parity_byte = Checksum(frame);
+                 char trailer = static_cast<char>(parity_byte.to_ulong());
+                 mmsg->setTrailer(trailer);
+                 // Switch cases on identifier
+                 checkCases("0000",mmsg,frame);
+                 Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
+                 Timers[currentWindowIndex]->setKind(1);
+                 scheduleAt(simTime()+PT+TO,Timers[currentWindowIndex]);
+                 incrementSequenceNo();
+            }
+            else if(msg->getKind() == 3)
+            {
+                payload = myBuffer[currentWindowIndex].second;
+                identifier = myBuffer[currentWindowIndex].first;
+                mmsg->setHeader(currentWindowIndex);
+                EV << identifier << endl;
+                EV << payload << endl;
+                std::string frame = Framing(payload);
+                EV << frame;
+                std::bitset<8> parity_byte = Checksum(frame);
+                char trailer = static_cast<char>(parity_byte.to_ulong());
+                mmsg->setTrailer(trailer);
+                // Switch cases on identifier
+                checkCases(identifier,mmsg,frame);
+                Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
+                Timers[currentWindowIndex]->setKind(1);
+                scheduleAt(simTime()+PT+TO,Timers[currentWindowIndex]);
+                incrementSequenceNo();
             }
             return;
         }
@@ -122,9 +159,6 @@ void Node::handleMessage(cMessage *msg)
             {
                 handleNACK(mmsg);
             }
-
-
-
         }
 
     }
@@ -135,17 +169,28 @@ void Node::handleMessage(cMessage *msg)
     }
 }
 void Node::handleACK(MyCustomMsg_Base* msg)
-void Node::handleACK(MyCustomMsg_Base* msg)
 {
-    startWindowIndex = incrementWindowNo(msg->getHeader());
-//    cancelAndDelete(Timers[(msg->getHeader() - 1)%(WS + 1)]);
+    startWindowIndex = incrementWindowNo(startWindowIndex);
+    endWindowIndex = incrementWindowNo(endWindowIndex);
+    cancelAndDelete(Timers[(msg->getHeader() - 1)%(WS + 1)]);
 }
 void Node::handleNACK(MyCustomMsg_Base* msg)
 {
-    currentWindowIndex = msg->getHeader();
+//    currentWindowIndex = msg->getHeader();
     MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
-    selfMessage->setKind(0);
+    selfMessage->setKind(2);
+    selfMessage->setHeader(startWindowIndex);
     scheduleAt(simTime()+0.001,selfMessage);
+
+    int index = incrementWindowNo(startWindowIndex);
+    while(index!=currentWindowIndex)
+    {
+        MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
+        selfMessage->setKind(3);
+        selfMessage->setHeader(index);
+        scheduleAt(simTime(),selfMessage);
+        index = incrementWindowNo(index);
+    }
 }
 std::ifstream Node::openFile(const std::string &fileName)
 {
