@@ -183,6 +183,10 @@ MyCustomMsg_Base::MyCustomMsg_Base(const char *name, short kind) : ::omnetpp::cM
     this->Trailer = 0;
     this->Frame_Type = 0;
     this->Ack_Nack_Num = 0;
+    this->Header = 0;
+    this->Trailer = 0;
+    this->Frame_Type = 0;
+    this->Ack_Nack_Num = 0;
 }
 
 MyCustomMsg_Base::MyCustomMsg_Base(const MyCustomMsg_Base& other) : ::omnetpp::cMessage(other)

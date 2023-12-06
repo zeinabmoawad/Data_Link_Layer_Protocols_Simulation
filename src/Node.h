@@ -70,8 +70,8 @@ class Node : public cSimpleModule
         void timeOutHandling();
         void handleACK(MyCustomMsg_Base* msg);
         void checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::string frame);
-        void handleNACK(MyCustomMsg_Base* msg);
         void logStates(std::string logs);
+        void handleNACK(MyCustomMsg_Base* msg);
         void incrementSequenceNo();
         int incrementWindowNo(int number);
         bool checkSeqBetween(int start,int end,int seq);
