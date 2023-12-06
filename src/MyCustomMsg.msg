@@ -16,7 +16,7 @@
 //
 // TODO generated message class
 //
-packet MyCustomMsg {
+message MyCustomMsg {
     @customize(true);  // see the generated C++ header for more info
     int Header;
     string Payload;

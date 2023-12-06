@@ -34,7 +34,9 @@ void Node::initialize()
     ED = getParentModule()->par("ED");
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
-    myBuffer = new std::pair<std::string, std::string>[WS];
+    myBuffer = new std::pair<std::string, std::string>[WS+1];
+    Timers = new MyCustomMsg_Base[WS+1];
+    endWindowIndex = WS-1;
 
     EV << "WS = " << WS << endl;
     EV << "TO = " << TO << endl;
@@ -67,7 +69,7 @@ void Node::handleMessage(cMessage *msg)
         // sending
         if(msg->isSelfMessage())
         {
-            if(msg->getKind() == 0)
+            if(msg->getKind() == 0 && checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex))
             {
                 EV << "Node "<< getIndex() << " is sender"<<endl;
                 std::pair<std::string, std::string> line = readNextLine(file);
@@ -94,23 +96,31 @@ void Node::handleMessage(cMessage *msg)
                     MyCustomMsg_Base* timeOutMsg = new MyCustomMsg_Base("time out");
                     timeOutMsg->setKind(1);
                     scheduleAt(simTime()+PT+TO,timeOutMsg);
-
+                    Timers[currentWindowIndex] = timeOutMsg;
                  }
             }
-            else
+            else if(msg->getKind() == 1)
             {
                 // time out
                 timeOutHandling();
                 cancelAndDelete(mmsg);
+
+            }
+            else
+            {
+               scheduleAt(simTime(),"Buffer is full");
             }
             return;
-
         }
         else{
             // Ack/Nack
             if(mmsg->getFrame_Type() == 1)
             {
                 handleACK(mmsg);
+            }
+            else if(mmsg->getFrame_Type() == 0)
+            {
+                handleNACK(mmsg);
             }
 
 
@@ -124,9 +134,17 @@ void Node::handleMessage(cMessage *msg)
         receivePacket(mmsg);
     }
 }
-void handleACK(MyCustomMsg_Base* msg)
+void Node::handleACK(MyCustomMsg_Base* msg)
 {
     startWindowIndex = incrementWindowNo(msg->getHeader());
+//    cancelAndDelete(Timers[(msg->getHeader() - 1)%(WS + 1)]);
+}
+void Node::handleNACK(MyCustomMsg_Base* msg)
+{
+    currentWindowIndex = msg->getHeader();
+    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
+    selfMessage->setKind(0);
+    scheduleAt(simTime()+0.001,selfMessage);
 }
 std::ifstream Node::openFile(const std::string &fileName)
 {
@@ -367,7 +385,8 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
 
 }
 
-void logStates(std::string logs)
+
+void Node::logStates(std::string logs)
 {
     // Open the file in append mode
         std::ofstream outputFile("output.txt", std::ios::app);
@@ -383,4 +402,70 @@ void logStates(std::string logs)
         outputFile.close();
 
         std::cout << "String appended to the file successfully." << std::endl;
+}
+void Node::incrementSequenceNo()
+{
+    if (currentWindowIndex+1 > WS)
+    {
+        currentWindowIndex =0;
+    }
+    else
+    {
+        currentWindowIndex++;
+    }
+}
+int Node::incrementWindowNo(int number)
+{
+    if (number+1 > WS)
+    {
+        number = 0;
+    }
+    else
+    {
+        number++;
+    }
+    return number;
+}
+bool Node::checkSeqBetween(int start,int end,int seq)
+{
+    if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq))
+            || ((seq < end )&& (end < start))  )
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+bool Node::checkCoordinator(MyCustomMsg_Base* msg)
+{
+    int senderID = msg->getSenderModuleId();
+    // check if coordinator ssending
+    if (senderID ==2)
+    {
+        // coordinator sending
+        EV << "coordinator sending "<<endl;
+        int nodeSending = msg->getAck_Nack_Num();
+        if(nodeSending == getIndex())
+        {
+            // sender
+            isSending = true;
+            startTime = atoi(msg->getPayload());
+            EV << "Node "<< getIndex() << " is sender"<<endl;
+            EV << "sending at time: "<<startTime<<endl;
+
+            // set parameter of sender;
+        }
+        else
+        {
+            isSending = false;
+            EV << "Node "<< getIndex() << " is receiver"<<endl;
+            // set parameter of receiver
+            WS = 1;
+
+        }
+        return true;
+    }
+    return false;
 }
