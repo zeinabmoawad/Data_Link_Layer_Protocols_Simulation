@@ -34,7 +34,8 @@ void Node::initialize()
     ED = getParentModule()->par("ED");
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
-    myBuffer = new std::pair<std::string, std::string>[WS+1];
+//    myBuffer = new std::pair<std::string, std::string>[WS+1];
+    myBuffer.resize(WS+1);
     Timers.resize(WS+1);
     endWindowIndex = WS-1;
 
@@ -172,7 +173,20 @@ void Node::handleACK(MyCustomMsg_Base* msg)
 {
     startWindowIndex = incrementWindowNo(startWindowIndex);
     endWindowIndex = incrementWindowNo(endWindowIndex);
-    cancelAndDelete(Timers[(msg->getHeader() - 1)%(WS + 1)]);
+    int frame_number = (msg->getAck_Nack_Num() - 1)%(WS + 1);
+    std::cout<<"Frame  num = "<<frame_number<<" msg->getHeader() = "<<msg->getAck_Nack_Num()<<endl;
+    if (Timers[frame_number] != NULL){
+        if(Timers[frame_number]->isScheduled()) // check if timer is scheduled
+        {
+           EV<<"Stopped timer for frame "<<frame_number<<endl; // if scheduled, cancel it
+           cancelAndDelete(Timers[frame_number]); // delete the timer message
+        }
+    }
+    else
+    {
+        std::cout<<"I am here"<<endl;
+    }
+//    cancelAndDelete(Timers[(msg->getHeader() - 1)%(WS + 1)]);
 }
 void Node::handleNACK(MyCustomMsg_Base* msg)
 {
@@ -234,6 +248,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
         // receiving from sender message
         std::string frame = msg->getPayload(); // message.getpayload
         char trailer = msg->getTrailer(); // message.gettrailer
+        std::cout << "Frame in reciever = "<<frame<<endl;
         bool errored_frame = ErrorDetection(frame, trailer);
         if (errored_frame)
         {
@@ -322,12 +337,11 @@ std::bitset<8> Node::Checksum(std::string frame)
 std::string Node::Deframing(std::string frame)
 {
     std::string payload;
+    std::cout<<"Frame = "<<frame<<endl;
     for(int i=1;i<frame.size()-1;i++)
     {
         if(frame[i] == '\\')
-        {
-            i++;
-        }
+            continue;
         payload += frame[i];
     }
     return payload;

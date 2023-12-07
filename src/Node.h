@@ -52,7 +52,7 @@ class Node : public cSimpleModule
 
         // receiver parameters
         int seqNumToReceive = 0;
-        std::pair<std::string, std::string>* myBuffer;
+        std::vector<std::pair<std::string, std::string>> myBuffer;
         std::vector<MyCustomMsg_Base *> Timers;
 
 
