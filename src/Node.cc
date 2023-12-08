@@ -81,7 +81,7 @@ void Node::handleMessage(cMessage *msg)
                 if (identifier.empty() && payload.empty())
                 {
                     EV << "File reading is done is done";
-                    endSimulation();
+//                    endSimulation();
                 }
                 else
                 {
@@ -96,6 +96,12 @@ void Node::handleMessage(cMessage *msg)
                     mmsg->setTrailer(trailer);
                     // Switch cases on identifier
                     checkCases(identifier,mmsg,frame);
+                    if (Timers[currentWindowIndex] != NULL){
+                        if(Timers[currentWindowIndex]->isScheduled()) // check if timer is scheduled
+                        {
+                           cancelAndDelete(Timers[currentWindowIndex]); // delete the timer message
+                        }
+                    }
 //                    MyCustomMsg_Base* timeOutMsg = new MyCustomMsg_Base("time out");
                     Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
                     Timers[currentWindowIndex]->setKind(1);
@@ -107,15 +113,15 @@ void Node::handleMessage(cMessage *msg)
             {
                 // time out
                 timeOutHandling();
-                cancelAndDelete(mmsg);
+                //cancelAndDelete(mmsg);
 
             }
-            else if(msg->getKind() == 2)
+            else if(msg->getKind() == 2) // NACK
             {
-                 payload = myBuffer[currentWindowIndex].second;
-                 identifier = myBuffer[currentWindowIndex].first;
-                 mmsg->setHeader(currentWindowIndex);
-                 EV << identifier << endl;
+                 payload = myBuffer[mmsg->getHeader()].second;
+                 identifier = myBuffer[mmsg->getHeader()].first;
+                 mmsg->setHeader(mmsg->getHeader());
+                 EV << identifier << 2<< endl;
                  EV << payload << endl;
                  std::string frame = Framing(payload);
                  EV << frame;
@@ -124,17 +130,22 @@ void Node::handleMessage(cMessage *msg)
                  mmsg->setTrailer(trailer);
                  // Switch cases on identifier
                  checkCases("0000",mmsg,frame);
-                 Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
-                 Timers[currentWindowIndex]->setKind(1);
-                 scheduleAt(simTime()+PT+TO,Timers[currentWindowIndex]);
-                 incrementSequenceNo();
+                 if (Timers[mmsg->getHeader()] != NULL){
+                     if(Timers[mmsg->getHeader()]->isScheduled()) // check if timer is scheduled
+                     {
+                        cancelAndDelete(Timers[mmsg->getHeader()]); // delete the timer message
+                     }
+                 }
+                 Timers[mmsg->getHeader()] = new MyCustomMsg_Base("time out");
+                 Timers[mmsg->getHeader()]->setKind(1);
+                 scheduleAt(simTime()+PT+TO,Timers[mmsg->getHeader()]);
             }
-            else if(msg->getKind() == 3)
+            else if(msg->getKind() == 3) // normal case
             {
-                payload = myBuffer[currentWindowIndex].second;
-                identifier = myBuffer[currentWindowIndex].first;
-                mmsg->setHeader(currentWindowIndex);
-                EV << identifier << endl;
+                payload = myBuffer[mmsg->getHeader()].second;
+                identifier = myBuffer[mmsg->getHeader()].first;
+                mmsg->setHeader(mmsg->getHeader());
+                EV << identifier << 3<< endl;
                 EV << payload << endl;
                 std::string frame = Framing(payload);
                 EV << frame;
@@ -143,10 +154,15 @@ void Node::handleMessage(cMessage *msg)
                 mmsg->setTrailer(trailer);
                 // Switch cases on identifier
                 checkCases(identifier,mmsg,frame);
-                Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
-                Timers[currentWindowIndex]->setKind(1);
-                scheduleAt(simTime()+PT+TO,Timers[currentWindowIndex]);
-                incrementSequenceNo();
+                if (Timers[mmsg->getHeader()] != NULL){
+                    if(Timers[mmsg->getHeader()]->isScheduled()) // check if timer is scheduled
+                    {
+                       cancelAndDelete(Timers[mmsg->getHeader()]); // delete the timer message
+                    }
+                }
+                Timers[mmsg->getHeader()] = new MyCustomMsg_Base("time out");
+                Timers[mmsg->getHeader()]->setKind(1);
+                scheduleAt(simTime()+PT+TO,Timers[mmsg->getHeader()]);
             }
             return;
         }
@@ -171,6 +187,7 @@ void Node::handleMessage(cMessage *msg)
 }
 void Node::handleACK(MyCustomMsg_Base* msg)
 {
+    EV <<"handleACK"<<endl;
     startWindowIndex = incrementWindowNo(startWindowIndex);
     endWindowIndex = incrementWindowNo(endWindowIndex);
     int frame_number = (msg->getAck_Nack_Num() - 1)%(WS + 1);
@@ -190,19 +207,31 @@ void Node::handleACK(MyCustomMsg_Base* msg)
 }
 void Node::handleNACK(MyCustomMsg_Base* msg)
 {
+       EV <<"handleNACK"<<endl;
 //    currentWindowIndex = msg->getHeader();
     MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
     selfMessage->setKind(2);
     selfMessage->setHeader(startWindowIndex);
     scheduleAt(simTime()+0.001,selfMessage);
-
+    if (Timers[startWindowIndex] != NULL){
+        if(Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
+         {
+           cancelAndDelete(Timers[startWindowIndex]);
+         }
+    }
     int index = incrementWindowNo(startWindowIndex);
     while(index!=currentWindowIndex)
     {
         MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
         selfMessage->setKind(3);
         selfMessage->setHeader(index);
-        scheduleAt(simTime(),selfMessage);
+        scheduleAt(simTime()+abs(index-startWindowIndex)*PT,selfMessage);
+        if (Timers[index] != NULL){
+            if(Timers[index]->isScheduled()) // check if timer is scheduled
+             {
+                cancelAndDelete(Timers[index]);
+             }
+        }
         index = incrementWindowNo(index);
     }
 }
@@ -264,7 +293,9 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
         else
         {
             int previousSeqNum  = seqNumToReceive;
+            std::cout <<"seqNumToReceive= " << seqNumToReceive << "WS = " << WS << endl;
             seqNumToReceive = incrementWindowNo(seqNumToReceive);
+            std::cout <<"seqNumToReceive= " << seqNumToReceive << endl;
             std::string payload = Deframing(frame);
             msg->setFrame_Type(1);
             msg->setAck_Nack_Num(seqNumToReceive);
@@ -348,10 +379,11 @@ std::string Node::Deframing(std::string frame)
 }
 bool Node::ErrorDetection(std::string frame, char parity_byte)
 {
-    return Checksum(frame) == std::bitset<8>(parity_byte);
+    return Checksum(frame) != std::bitset<8>(parity_byte);
 }
 void Node::timeOutHandling()
 {
+    EV <<"timeOutHandling"<<endl;
     // resend all messages from start window to current index
     // resend first message with free error then other in no error
     MyCustomMsg_Base* msgToSend = new MyCustomMsg_Base();
@@ -395,21 +427,22 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
 
     switch (inputValue) {
         case 0b0000:
-            sendDelayed(msg, simTime()+PT+TD,"out");
+            msg->setPayload(frame.c_str());
+            sendDelayed(msg, PT+TD,"out");
             break;
         case 0b0001:
             msg->setPayload(frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD+ED, "out");
+            sendDelayed(msg, PT+TD+ED, "out");
             break;
         case 0b0010:
             msg->setPayload(frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD, "out");
-            sendDelayed(msg, simTime()+PT+TD+DD, "out");
+            sendDelayed(msg, PT+TD, "out");
+            sendDelayed(msg, PT+TD+DD, "out");
             break;
         case 0b0011:
             msg->setPayload(frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD+ED, "out");
-            sendDelayed(msg, simTime()+PT+TD+DD+ED, "out");
+            sendDelayed(msg, PT+TD+ED, "out");
+            sendDelayed(msg, PT+TD+DD+ED, "out");
             break;
         case 0b0100: // loss
             break;
@@ -422,24 +455,24 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
         case 0b1000:
             modified_frame = Modification(frame);
             msg->setPayload(modified_frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD, "out");
+            sendDelayed(msg, PT+TD, "out");
             break;
         case 0b1001:
             modified_frame = Modification(frame);
             msg->setPayload(modified_frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD+ED, "out");
+            sendDelayed(msg, PT+TD+ED, "out");
             break;
         case 0b1010:
             modified_frame = Modification(frame);
             msg->setPayload(modified_frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD, "out");
-            sendDelayed(new MyCustomMsg_Base(*msg), simTime()+PT+TD+DD, "out");
+            sendDelayed(msg, PT+TD, "out");
+            sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD, "out");
             break;
         case 0b1011: // Mod, dup,delay
             modified_frame = Modification(frame);
             msg->setPayload(modified_frame.c_str());
-            sendDelayed(msg, simTime()+PT+TD+ED, "out");
-            sendDelayed(msg, simTime()+PT+TD+DD+ED, "out");
+            sendDelayed(msg, PT+TD+ED, "out");
+            sendDelayed(msg, PT+TD+DD+ED, "out");
             break;
         case 0b1100: // loss, mod
             break;
@@ -532,7 +565,7 @@ bool Node::checkCoordinator(MyCustomMsg_Base* msg)
             isSending = false;
             EV << "Node "<< getIndex() << " is receiver"<<endl;
             // set parameter of receiver
-            WS = 1;
+            //WS = 1;
 
         }
         return true;
