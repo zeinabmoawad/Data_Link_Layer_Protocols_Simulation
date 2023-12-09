@@ -55,12 +55,12 @@ class Node : public cSimpleModule
         std::vector<std::pair<std::string, std::string>> myBuffer;
         std::vector<MyCustomMsg_Base *> Timers;
         int lastNACKedFrame = -1;
-
+        std::string outputFileName;
 
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
-        std::string Modification(std::string message);
+        std::string Modification(std::string message, int& errorBit);
         std::string Framing(std::string message);
         std::bitset<8> Checksum(std::string frame);
         std::string Deframing(std::string frame);
