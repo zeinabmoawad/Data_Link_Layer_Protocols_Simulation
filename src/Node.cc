@@ -72,6 +72,7 @@ void Node::handleMessage(cMessage *msg)
         // sending
         if(msg->isSelfMessage())
         {
+            EV << msg->getKind() << checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex);
             if(msg->getKind() == 0 && checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex))
             {
                 EV << "Node "<< getIndex() << " is sender"<<endl;
@@ -100,6 +101,7 @@ void Node::handleMessage(cMessage *msg)
                         if(Timers[currentWindowIndex]->isScheduled()) // check if timer is scheduled
                         {
                            cancelAndDelete(Timers[currentWindowIndex]); // delete the timer message
+                           Timers[currentWindowIndex] = NULL;
                         }
                     }
 //                    MyCustomMsg_Base* timeOutMsg = new MyCustomMsg_Base("time out");
@@ -130,10 +132,11 @@ void Node::handleMessage(cMessage *msg)
                  mmsg->setTrailer(trailer);
                  // Switch cases on identifier
                  checkCases("0000",mmsg,frame);
-                 if (Timers[mmsg->getHeader()] != NULL){
+                 if (Timers[mmsg->getHeader()] != nullptr){
                      if(Timers[mmsg->getHeader()]->isScheduled()) // check if timer is scheduled
                      {
                         cancelAndDelete(Timers[mmsg->getHeader()]); // delete the timer message
+                        Timers[mmsg->getHeader()] = NULL;
                      }
                  }
                  Timers[mmsg->getHeader()] = new MyCustomMsg_Base("time out");
@@ -158,6 +161,7 @@ void Node::handleMessage(cMessage *msg)
                     if(Timers[mmsg->getHeader()]->isScheduled()) // check if timer is scheduled
                     {
                        cancelAndDelete(Timers[mmsg->getHeader()]); // delete the timer message
+                       Timers[mmsg->getHeader()] = NULL;
                     }
                 }
                 Timers[mmsg->getHeader()] = new MyCustomMsg_Base("time out");
@@ -197,13 +201,16 @@ void Node::handleACK(MyCustomMsg_Base* msg)
         {
            EV<<"Stopped timer for frame "<<frame_number<<endl; // if scheduled, cancel it
            cancelAndDelete(Timers[frame_number]); // delete the timer message
+           Timers[frame_number] = NULL;
         }
     }
     else
     {
         std::cout<<"I am here"<<endl;
     }
-//    cancelAndDelete(Timers[(msg->getHeader() - 1)%(WS + 1)]);
+    MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message");
+    selfMessage2->setKind(0);
+    scheduleAt(simTime(),selfMessage2);
 }
 void Node::handleNACK(MyCustomMsg_Base* msg)
 {
@@ -217,6 +224,7 @@ void Node::handleNACK(MyCustomMsg_Base* msg)
         if(Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
          {
            cancelAndDelete(Timers[startWindowIndex]);
+           Timers[startWindowIndex] = NULL;
          }
     }
     int index = incrementWindowNo(startWindowIndex);
@@ -226,14 +234,18 @@ void Node::handleNACK(MyCustomMsg_Base* msg)
         selfMessage->setKind(3);
         selfMessage->setHeader(index);
         scheduleAt(simTime()+abs(index-startWindowIndex)*PT,selfMessage);
-        if (Timers[index] != NULL){
+        if (Timers[index] != nullptr){
             if(Timers[index]->isScheduled()) // check if timer is scheduled
              {
                 cancelAndDelete(Timers[index]);
+                Timers[index] = NULL;
              }
         }
         index = incrementWindowNo(index);
     }
+    MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message");
+    selfMessage2->setKind(0);
+    scheduleAt(simTime()+abs(index-startWindowIndex)*PT,selfMessage2);
 }
 std::ifstream Node::openFile(const std::string &fileName)
 {
@@ -531,8 +543,9 @@ int Node::incrementWindowNo(int number)
 }
 bool Node::checkSeqBetween(int start,int end,int seq)
 {
+    EV <<endl<< "start" << start << "end" <<end<<"seq"<<seq<<endl;
     if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq))
-            || ((seq < end )&& (end < start))  )
+            || ((seq < end )&& (end < start))  || seq == end)
     {
         return true;
     }
