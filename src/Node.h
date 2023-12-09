@@ -54,6 +54,7 @@ class Node : public cSimpleModule
         int seqNumToReceive = 0;
         std::vector<std::pair<std::string, std::string>> myBuffer;
         std::vector<MyCustomMsg_Base *> Timers;
+        int lastNACKedFrame = -1;
 
 
     protected:
