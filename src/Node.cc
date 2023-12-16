@@ -35,8 +35,8 @@ void Node::initialize()
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
 //    myBuffer = new std::pair<std::string, std::string>[WS+1];
-    myBuffer.resize(WS+1);
-    Timers.resize(WS+1);
+    myBuffer.resize(WS+2);
+    Timers.resize(WS+2);
     endWindowIndex = WS-1;
     outputFileName = "../src/output.txt";
 
@@ -106,6 +106,7 @@ void Node::handleMessage(cMessage *msg)
                     mmsg->setHeader(currentWindowIndex);
                     EV << identifier << endl;
                     EV << payload << endl;
+                    std::cout<<"current window index reading new line "<<currentWindowIndex <<endl;
                     myBuffer[currentWindowIndex] = line;
                     std::string frame = Framing(payload);
                     EV << frame;
@@ -211,21 +212,22 @@ void Node::handleMessage(cMessage *msg)
 }
 void Node::handleACK(MyCustomMsg_Base* msg)
 {
-    if(msg->getHeader() == startWindowIndex)
+    int frame_number = (msg->getAck_Nack_Num() - 1)%(WS + 1);
+    while(checkSeqBetween(startWindowIndex, currentWindowIndex, frame_number))
     {
         EV <<"handleACK"<<endl;
-        startWindowIndex = incrementWindowNo(startWindowIndex);
-        endWindowIndex = incrementWindowNo(endWindowIndex);
-        int frame_number = (msg->getAck_Nack_Num() - 1)%(WS + 1);
         std::cout<<"Frame  num = "<<frame_number<<" msg->getHeader() = "<<msg->getAck_Nack_Num()<<endl;
-        if (Timers[frame_number] != NULL){
-            if(Timers[frame_number]->isScheduled()) // check if timer is scheduled
+        if (Timers[startWindowIndex] != NULL)
+        {
+            if(Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
             {
-               EV<<"Stopped timer for frame "<<frame_number<<endl; // if scheduled, cancel it
-               cancelAndDelete(Timers[frame_number]); // delete the timer message
-               Timers[frame_number] = NULL;
+               EV<<"Stopped timer for frame "<<startWindowIndex<<endl; // if scheduled, cancel it
+               cancelAndDelete(Timers[startWindowIndex]); // delete the timer message
+               Timers[startWindowIndex] = NULL;
             }
         }
+        startWindowIndex = incrementWindowNo(startWindowIndex);
+        endWindowIndex = incrementWindowNo(endWindowIndex);
     }
     MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message");
     selfMessage2->setKind(0);
@@ -319,7 +321,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                 {
                     msg->setAck_Nack_Num(seqNumToReceive);
                     msg->setFrame_Type(0);
-                    send(msg,"out");
+                    sendDelayed(msg, TD,"out");
                     EV << "Receiver: error in frame no"<< seqNumToReceive<<endl;
                     std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
                                                   std::to_string(seqNumToReceive)+"] , loss [No]";
@@ -333,6 +335,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                                                   std::to_string(seqNumToReceive)+"] , loss [Yes]";
                     logStates(logs);
                 }
+               return;
             }
         }
         else
@@ -346,7 +349,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
             {
                 msg->setFrame_Type(1);
                 msg->setAck_Nack_Num(seqNumToReceive);
-                send(msg,"out");
+                sendDelayed(msg, TD,"out");
                 EV << "Receiver: message received "<< payload<<endl;
 
                 // print payload
@@ -367,10 +370,18 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                 logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
                 logStates(logs);
             }
+            return;
         }
-
-
     }
+        msg->setFrame_Type(1);
+        msg->setAck_Nack_Num(seqNumToReceive);
+        sendDelayed(msg, TD,"out");
+        EV << "Receiver: resnd ack "<<endl;
+
+        // print payload
+        std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Resending [ACK] with number ["+
+                                                  std::to_string(seqNumToReceive)+"] , loss [No]";
+        logStates(logs);
 }
 std::string Node::Modification(std::string message, int& errorBit)
 {
@@ -594,7 +605,7 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
         logStates(logs);
         if(isDuplicate)
         {
-            logs = "At time [ " + std::to_string((simTime() + PT).dbl()) + " ], Node[ " + std::to_string(getIndex()) + " ]"
+            logs = "At time [ " + std::to_string((simTime() + PT + DD).dbl()) + " ], Node[ " + std::to_string(getIndex()) + " ]"
                         " [sent] frame with seq_num=[" + std::to_string(msg->getHeader()) + "] and payload=[ " + msg->getPayload() + " ] "
                         "and trailer=[ " + std::bitset<8>(msg->getTrailer()).to_string() + " ] , Modified [ " + ((isModified) ? std::to_string(errorBit) : "-1") + " ]"
                         " , Lost[ " + ((isLoss) ? "Yes" : "No") + " ], Duplicate [ 2 ],"
@@ -623,7 +634,7 @@ void Node::logStates(std::string logs)
 }
 void Node::incrementSequenceNo()
 {
-    if (currentWindowIndex+1 > WS)
+    if (currentWindowIndex+1 > WS + 1)
     {
         currentWindowIndex =0;
     }
@@ -634,7 +645,7 @@ void Node::incrementSequenceNo()
 }
 int Node::incrementWindowNo(int number)
 {
-    if (number+1 > WS)
+    if (number+1 > WS + 1)
     {
         number = 0;
     }
@@ -647,7 +658,7 @@ int Node::incrementWindowNo(int number)
 bool Node::checkSeqBetween(int start,int end,int seq)
 {
     EV <<endl<< "start" << start << "end" <<end<<"seq"<<seq<<endl;
-    if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq))
+    if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq)) // start<= seq 2 are deleted
             || ((seq < end )&& (end < start))  || seq == end)
     {
         return true;
