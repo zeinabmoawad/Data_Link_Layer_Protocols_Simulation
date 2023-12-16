@@ -29,5 +29,17 @@ At time[16.501000], Node[1] Sending [ACK] with number [3] , loss [No]
 Uploading payload=[is the reproductive$ structure found  also called/ angiosperms$).] and seq_num =[2] to the network layer
 At time[17.001000], Node[1] Sending [ACK] with number [4] , loss [No]
 Uploading payload=[(plants of the division Magnoliophyta,  is to facilitate reproduction,] and seq_num =[3] to the network layer
+At time[17.501000], Node[0], Introducing channel error with code = [ 0100 ]
+At time [ 18.001000 ], Node[ 0 ] [sent] frame with seq_num=[0] and payload=[ $usually by providing a mechanism for Flowers may facilitate outcrossing\$$ ] and trailer=[ 11100011 ] , Modified [ -1 ] , Lost[ Yes ], Duplicate [ 0 ], Delay [ 0 ]
+At time[18.001000], Node[0], Introducing channel error with code = [ 0000 ]
+At time [ 18.501000 ], Node[ 0 ] [sent] frame with seq_num=[1] and payload=[ $\$\$the union of sperm with eggs.$ ] and trailer=[ 00010101 ] , Modified [ -1 ] , Lost[ No ], Duplicate [ 0 ], Delay [ 0 ]
+At time[19.501000], Node[1] Resending [ACK] with number [4] , loss [No]
 At time[21.501000], Node[1] Sending [ACK] with number [0] , loss [No]
 Uploading payload=[The biological function of $/a flower] and seq_num =[4] to the network layer
+Time out event at time [ 28.001000 ], at Node[ 0 ] for frame with seq_num=[ 0 ]
+At time [ 28.501000 ], Node[ 0 ] [sent] frame with seq_num=[0] and payload=[ $usually by providing a mechanism for Flowers may facilitate outcrossing\$$ ] and trailer=[ 11100011 ] , Modified [ -1 ] , Lost[ No ], Duplicate [ 0 ], Delay [ 0 ]
+At time [ 29.001000 ], Node[ 0 ] [sent] frame with seq_num=[1] and payload=[ $\$\$the union of sperm with eggs.$ ] and trailer=[ 00010101 ] , Modified [ -1 ] , Lost[ No ], Duplicate [ 0 ], Delay [ 0 ]
+At time[29.501000], Node[1] Sending [ACK] with number [1] , loss [No]
+Uploading payload=[usually by providing a mechanism for Flowers may facilitate outcrossing$] and seq_num =[0] to the network layer
+At time[30.001000], Node[1] Sending [ACK] with number [2] , loss [No]
+Uploading payload=[$$the union of sperm with eggs.] and seq_num =[1] to the network layer
