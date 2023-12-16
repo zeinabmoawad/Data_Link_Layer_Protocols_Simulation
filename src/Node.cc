@@ -101,9 +101,10 @@ void Node::handleMessage(cMessage *msg)
                 }
                 else
                 {
+                    MyCustomMsg_Base* send_msg = new MyCustomMsg_Base("send message");
                     std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ "+identifier+" ]";
                                    logStates(logs);
-                    mmsg->setHeader(currentWindowIndex);
+                    send_msg->setHeader(currentWindowIndex);
                     EV << identifier << endl;
                     EV << payload << endl;
                     std::cout<<"current window index reading new line "<<currentWindowIndex <<endl;
@@ -112,10 +113,10 @@ void Node::handleMessage(cMessage *msg)
                     EV << frame;
                     std::bitset<8> parity_byte = Checksum(frame);
                     char trailer = static_cast<char>(parity_byte.to_ulong());
-                    mmsg->setTrailer(trailer);
+                    send_msg->setTrailer(trailer);
                     // Switch cases on identifier
-                    checkCases(identifier,mmsg,frame);
-                    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
+                    checkCases(identifier,send_msg,frame);
+                    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message1");
                     selfMessage->setKind(0);
                     scheduleAt(simTime()+PT,selfMessage);
                     if (Timers[currentWindowIndex] != NULL){
@@ -235,6 +236,7 @@ void Node::handleACK(MyCustomMsg_Base* msg)
 }
 void Node::handleNACK(MyCustomMsg_Base* msg)
 {
+    int counter = 1;
        EV <<"handleNACK"<<endl;
 //    currentWindowIndex = msg->getHeader();
     MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
@@ -254,7 +256,7 @@ void Node::handleNACK(MyCustomMsg_Base* msg)
         MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
         selfMessage->setKind(3);
         selfMessage->setHeader(index);
-        scheduleAt(simTime()+abs(index-startWindowIndex)*PT+0.001,selfMessage);
+        scheduleAt(simTime()+counter*PT+0.001,selfMessage);
         if (Timers[index] != nullptr){
             if(Timers[index]->isScheduled()) // check if timer is scheduled
              {
@@ -263,10 +265,11 @@ void Node::handleNACK(MyCustomMsg_Base* msg)
              }
         }
         index = incrementWindowNo(index);
+        counter++;
     }
     MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message");
     selfMessage2->setKind(0);
-    scheduleAt(simTime()+abs(index-startWindowIndex)*PT+0.001,selfMessage2);
+    scheduleAt(simTime()+counter*PT+0.001,selfMessage2);
 }
 std::ifstream Node::openFile(const std::string &fileName)
 {
@@ -452,6 +455,7 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 }
 void Node::timeOutHandling()
 {
+    int counter = 1;
     EV <<"timeOutHandling"<<endl;
     std::string myMessage = "timeout for message" + myBuffer[startWindowIndex].second;
    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base(myMessage.c_str());
@@ -468,7 +472,7 @@ void Node::timeOutHandling()
        MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base(myMessage.c_str());
        selfMessage->setKind(3);
        selfMessage->setHeader(index);
-       scheduleAt(simTime()+abs(index-startWindowIndex)*PT,selfMessage);
+       scheduleAt(simTime()+counter*PT,selfMessage);
        if (Timers[index] != nullptr){
            if(Timers[index]->isScheduled()) // check if timer is scheduled
             {
@@ -476,11 +480,13 @@ void Node::timeOutHandling()
                Timers[index] = NULL;
             }
        }
+       counter++;
        index = incrementWindowNo(index);
+       std::cout<<"index " <<index<<endl;
    }
    MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message after timeoutHandling to continue reading the file");
    selfMessage2->setKind(0);
-   scheduleAt(simTime()+abs(index-startWindowIndex)*PT,selfMessage2);
+   scheduleAt(simTime()+counter*PT,selfMessage2);
 }
 
 
@@ -511,14 +517,14 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
                 isDuplicate = true;
                 msg->setPayload(frame.c_str());
                 sendDelayed(msg, PT+TD, "out");
-                sendDelayed(msg, PT+TD+DD, "out");
+                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD, "out");
                 break;
             case 0b0011: //duplicate,delay
                 isDuplicate = true;
                 isDelayed = true;
                 msg->setPayload(frame.c_str());
                 sendDelayed(msg, PT+TD+ED, "out");
-                sendDelayed(msg, PT+TD+DD+ED, "out");
+                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD+ED, "out");
                 break;
             case 0b0100: // loss
                 isLoss = true;
@@ -564,7 +570,7 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
                 modified_frame = Modification(frame,errorBit);
                 msg->setPayload(modified_frame.c_str());
                 sendDelayed(msg, PT+TD+ED, "out");
-                sendDelayed(msg, PT+TD+DD+ED, "out");
+                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD+ED, "out");
                 break;
             case 0b1100: // loss, mod
                 isModified = true;
