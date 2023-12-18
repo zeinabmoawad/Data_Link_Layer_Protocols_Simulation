@@ -35,8 +35,8 @@ void Node::initialize()
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
 //    myBuffer = new std::pair<std::string, std::string>[WS+1];
-    myBuffer.resize(WS+2);
-    Timers.resize(WS+2);
+    myBuffer.resize(WS+1);
+    Timers.resize(WS+1);
     endWindowIndex = WS-1;
     outputFileName = "../src/output.txt";
 
@@ -72,12 +72,13 @@ void Node::handleMessage(cMessage *msg)
                             // Open the file in output mode to truncate it
                             std::ofstream ofs(outputFileName, std::ofstream::out | std::ofstream::trunc);
                             ofs.close();
-                            std::cout << "File '" << outputFileName << "' exists and has been emptied." << std::endl;
+//                            std::cout << "File '" << outputFileName << "' exists and has been emptied." << std::endl;
                         } else {
-                            std::cout << "File '" << outputFileName << "' does not exist." << std::endl;
+//                            std::cout << "File '" << outputFileName << "' does not exist." << std::endl;
                         }
             msg->setKind(0);
             scheduleAt(simTime()+startTime,msg);
+            std::cout<<"At the beginning at time = "<< simTime().dbl()+startTime<<endl;
         }
 
     }
@@ -87,10 +88,12 @@ void Node::handleMessage(cMessage *msg)
         // sending
         if(msg->isSelfMessage())
         {
-            EV << msg->getKind() << checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex);
-            if(msg->getKind() == 0 && checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex))
+//            printBuffer();
+//            EV << msg->getKind() << checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex);
+            std::cout<<"I am sender self message  startWindowIndex = " <<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<" endWindowIndex= "<<endWindowIndex<<endl;
+            if(msg->getKind() == 0 && checkSeqBetween2(startWindowIndex, endWindowIndex, currentWindowIndex))
             {
-                EV << "Node "<< getIndex() << " is sender"<<endl;
+//                EV << "Node "<< getIndex() << " is sender"<<endl;
                 std::pair<std::string, std::string> line = readNextLine(file);
                 identifier = line.first;
                 payload = line.second;
@@ -105,12 +108,13 @@ void Node::handleMessage(cMessage *msg)
                     std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ "+identifier+" ]";
                                    logStates(logs);
                     send_msg->setHeader(currentWindowIndex);
-                    EV << identifier << endl;
-                    EV << payload << endl;
-                    std::cout<<"current window index reading new line "<<currentWindowIndex <<endl;
+//                    EV << identifier << endl;
+//                    EV << payload << endl;
+//                    std::cout<<"current window index reading new line "<<currentWindowIndex <<endl;
+                    std::cout<<"I am reading new msg =  " <<payload<<" seq = "<<currentWindowIndex<<endl;
                     myBuffer[currentWindowIndex] = line;
                     std::string frame = Framing(payload);
-                    EV << frame;
+//                    EV << frame;
                     std::bitset<8> parity_byte = Checksum(frame);
                     char trailer = static_cast<char>(parity_byte.to_ulong());
                     send_msg->setTrailer(trailer);
@@ -136,6 +140,7 @@ void Node::handleMessage(cMessage *msg)
             else if(msg->getKind() == 1)
             {
                 // time out
+                std::cout<<"self msg for timeout = "<< simTime().dbl()<<endl;
                 timeOutHandling();
                 //cancelAndDelete(mmsg);
 
@@ -144,11 +149,12 @@ void Node::handleMessage(cMessage *msg)
             {
                  payload = myBuffer[mmsg->getHeader()].second;
                  identifier = myBuffer[mmsg->getHeader()].first;
+                std::cout<<"Handling error free after NACK/TIMEOUT = "<< simTime().dbl()<<" payload = "<<payload<<endl;
                  mmsg->setHeader(mmsg->getHeader());
-                 EV << identifier << 2<< endl;
-                 EV << payload << endl;
+//                 EV << identifier << 2<< endl;
+//                 EV << payload << endl;
                  std::string frame = Framing(payload);
-                 EV << frame;
+//                 EV << frame;
                  std::bitset<8> parity_byte = Checksum(frame);
                  char trailer = static_cast<char>(parity_byte.to_ulong());
                  mmsg->setTrailer(trailer);
@@ -169,11 +175,12 @@ void Node::handleMessage(cMessage *msg)
             {
                 payload = myBuffer[mmsg->getHeader()].second;
                 identifier = myBuffer[mmsg->getHeader()].first;
+                std::cout<<"Handling after NACK/TIMEOUT = "<< simTime().dbl()<<" payload = "<<payload<<endl;
                 mmsg->setHeader(mmsg->getHeader());
-                EV << identifier << 3<< endl;
-                EV << payload << endl;
+//                EV << identifier << 3<< endl;
+//                EV << payload << endl;
                 std::string frame = Framing(payload);
-                EV << frame;
+//                EV << frame;
                 std::bitset<8> parity_byte = Checksum(frame);
                 char trailer = static_cast<char>(parity_byte.to_ulong());
                 mmsg->setTrailer(trailer);
@@ -193,6 +200,7 @@ void Node::handleMessage(cMessage *msg)
             return;
         }
         else{
+            std::cout<<"I am sender NOT SELF MSG handle ack/nack at = "<<simTime().dbl()<<" startWindowIndex = " <<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<" endWindowIndex= "<<endWindowIndex<<endl;
             // Ack/Nack
             if(mmsg->getFrame_Type() == 1)
             {
@@ -207,17 +215,21 @@ void Node::handleMessage(cMessage *msg)
     }
     else
     {
+        std::cout<<"I am reciever = "<<simTime().dbl()<<endl;
         // receiving from sender message
         receivePacket(mmsg);
     }
 }
 void Node::handleACK(MyCustomMsg_Base* msg)
 {
-    int frame_number = (msg->getAck_Nack_Num() - 1)%(WS + 1);
+    int frame_number = ((msg->getAck_Nack_Num() + WS))%(WS + 1);
+    std::cout<<"In handle ACK frame_number = "<<frame_number<<" msg->getAck_Nack_Num() = "<<msg->getAck_Nack_Num()<<endl;
     while(checkSeqBetween(startWindowIndex, currentWindowIndex, frame_number))
     {
-        EV <<"handleACK"<<endl;
-        std::cout<<"Frame  num = "<<frame_number<<" msg->getHeader() = "<<msg->getAck_Nack_Num()<<endl;
+//        EV <<"handleACK"<<endl;
+        std::cout<<"In WHILE LOOP  startWindowIndex= "<<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<endl;
+
+        std::cout<<"Handling ACK at time = "<<simTime().dbl()<<" startWindowIndex = " <<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<" endWindowIndex= "<<endWindowIndex<<endl;
         if (Timers[startWindowIndex] != NULL)
         {
             if(Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
@@ -237,8 +249,9 @@ void Node::handleACK(MyCustomMsg_Base* msg)
 void Node::handleNACK(MyCustomMsg_Base* msg)
 {
     int counter = 1;
-       EV <<"handleNACK"<<endl;
+//       EV <<"handleNACK"<<endl;
 //    currentWindowIndex = msg->getHeader();
+    std::cout<<"I am handling nack at time = "<<simTime().dbl()<<endl;
     MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
     selfMessage->setKind(2);
     selfMessage->setHeader(startWindowIndex);
@@ -307,24 +320,29 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
     //      else send ack
     // else do not respond with message
     double random = uniform(0,1);
+//    std::cout<<"random =  "<<random<<endl;
     bool lostACK = random<LP? true:false;
+    std::cout<<"I am in recieve packet at time = "<<simTime().dbl()<<" Loss = "<<lostACK<<endl;
     if (seqNumToReceive == msg->getHeader())
     {
         // receiving from sender message
         std::string frame = msg->getPayload(); // message.getpayload
         char trailer = msg->getTrailer(); // message.gettrailer
-        std::cout << "Frame in reciever = "<<frame<<endl;
+//        std::cout << "Frame in reciever = "<<frame<<endl;
         bool errored_frame = ErrorDetection(frame, trailer);
+        std::cout<<"I am the expected packet to receive= "<<seqNumToReceive<<" error frame = "<<errored_frame<<endl;
         if (errored_frame)
         {
+            std::cout<<"Will I send NACK lastNACKedFrame= "<<lastNACKedFrame<<endl;
             if(lastNACKedFrame != seqNumToReceive)
             {
                 // send Nack to sender with same header with probability LP
+                std::cout<<"Frame recieved = "<<frame<<endl;
                 if(!lostACK)
                 {
                     msg->setAck_Nack_Num(seqNumToReceive);
                     msg->setFrame_Type(0);
-                    sendDelayed(msg, TD,"out");
+                    sendDelayed(msg, TD+PT,"out");
                     EV << "Receiver: error in frame no"<< seqNumToReceive<<endl;
                     std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
                                                   std::to_string(seqNumToReceive)+"] , loss [No]";
@@ -333,10 +351,12 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                 }
                 else
                 {
+                    std::cout<<"********************************************************"<<endl;
                     EV << "Receiver: error in frame no and NACK is Lost"<< seqNumToReceive<<endl;
                     std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
                                                   std::to_string(seqNumToReceive)+"] , loss [Yes]";
                     logStates(logs);
+                    lastNACKedFrame = seqNumToReceive;
                 }
                return;
             }
@@ -344,15 +364,17 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
         else
         {
             int previousSeqNum  = seqNumToReceive;
-            std::cout <<"seqNumToReceive= " << seqNumToReceive << "WS = " << WS << endl;
+//            std::cout <<"seqNumToReceive= " << seqNumToReceive << "WS = " << WS << endl;
             seqNumToReceive = incrementWindowNo(seqNumToReceive);
-            std::cout <<"seqNumToReceive= " << seqNumToReceive << endl;
+//            std::cout <<"seqNumToReceive= " << seqNumToReceive << endl;
             std::string payload = Deframing(frame);
+            std::cout<<"I am the expected packet to receive= "<<seqNumToReceive<<" payload = "<<payload<<" sending ack"<<endl;
+
             if(!lostACK)
             {
                 msg->setFrame_Type(1);
                 msg->setAck_Nack_Num(seqNumToReceive);
-                sendDelayed(msg, TD,"out");
+                sendDelayed(msg, TD+PT,"out");
                 EV << "Receiver: message received "<< payload<<endl;
 
                 // print payload
@@ -366,6 +388,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
             }
             else
             {
+                std::cout<<"********************************************************"<<endl;
                 std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
                                                                           std::to_string(seqNumToReceive)+"] , loss [Yes]";
                 logStates(logs);
@@ -376,10 +399,11 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
             return;
         }
     }
+    std::cout<<"I am not the expected packet to receive= "<<seqNumToReceive<<" while it came= "<<msg->getHeader()<<" payload = "<<msg->getPayload()<<" resesending ack"<<endl;
         msg->setFrame_Type(1);
         msg->setAck_Nack_Num(seqNumToReceive);
-        sendDelayed(msg, TD,"out");
-        EV << "Receiver: resnd ack "<<endl;
+        sendDelayed(msg, TD+PT,"out");
+//        EV << "Receiver: resnd ack "<<endl;
 
         // print payload
         std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Resending [ACK] with number ["+
@@ -440,7 +464,7 @@ std::bitset<8> Node::Checksum(std::string frame)
 std::string Node::Deframing(std::string frame)
 {
     std::string payload;
-    std::cout<<"Frame = "<<frame<<endl;
+//    std::cout<<"Frame = "<<frame<<endl;
     for(int i=1;i<frame.size()-1;i++)
     {
         if(frame[i] == '\\')
@@ -456,7 +480,7 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 void Node::timeOutHandling()
 {
     int counter = 1;
-    EV <<"timeOutHandling"<<endl;
+//    EV <<"timeOutHandling"<<endl;
     std::string myMessage = "timeout for message" + myBuffer[startWindowIndex].second;
    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base(myMessage.c_str());
    selfMessage->setKind(2);
@@ -482,7 +506,7 @@ void Node::timeOutHandling()
        }
        counter++;
        index = incrementWindowNo(index);
-       std::cout<<"index " <<index<<endl;
+//       std::cout<<"index " <<index<<endl;
    }
    MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message after timeoutHandling to continue reading the file");
    selfMessage2->setKind(0);
@@ -636,11 +660,11 @@ void Node::logStates(std::string logs)
         // Close the file
         outputFile.close();
 
-        std::cout << "String appended to the file successfully." << std::endl;
+//        std::cout << "String appended to the file successfully." << std::endl;
 }
 void Node::incrementSequenceNo()
 {
-    if (currentWindowIndex+1 > WS + 1)
+    if (currentWindowIndex+1 > WS)
     {
         currentWindowIndex =0;
     }
@@ -651,7 +675,7 @@ void Node::incrementSequenceNo()
 }
 int Node::incrementWindowNo(int number)
 {
-    if (number+1 > WS + 1)
+    if (number+1 > WS)
     {
         number = 0;
     }
@@ -663,9 +687,22 @@ int Node::incrementWindowNo(int number)
 }
 bool Node::checkSeqBetween(int start,int end,int seq)
 {
-    EV <<endl<< "start" << start << "end" <<end<<"seq"<<seq<<endl;
+    EV <<endl<< " start = " << start << " end = " <<end<<" frame = "<<seq<<endl;
     if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq)) // start<= seq 2 are deleted
-            || ((seq < end )&& (end < start))  || seq == end)
+            || ((seq < end )&& (end < start)))
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+bool Node::checkSeqBetween2(int start,int end,int seq)
+{
+    EV <<endl<< " start = " << start << " end = " <<end<<" frame = "<<seq<<endl;
+    if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq)) // start<= seq 2 are deleted
+            || ((seq < end )&& (end < start)) || (seq == end))
     {
         return true;
     }
@@ -704,5 +741,12 @@ bool Node::checkCoordinator(MyCustomMsg_Base* msg)
         return true;
     }
     return false;
+}
+
+void Node::printBuffer()
+{
+   EV<<"startWindowIndex = "<<myBuffer[startWindowIndex].second<<endl;
+   EV<<"currentWindowIndex = "<<myBuffer[currentWindowIndex].second<<endl;
+   EV<<"endWindowIndex = "<<myBuffer[endWindowIndex].second<<endl;
 }
 

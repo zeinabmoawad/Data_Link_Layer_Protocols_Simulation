@@ -3,3 +3,6 @@ out
 .settings
 src/network_projecr_dbg.exe
 .txt
+src/network_projecr_dbg.exe
+src/Makefile
+simulations/results/General-\#0.sca

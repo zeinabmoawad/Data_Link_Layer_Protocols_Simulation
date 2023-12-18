@@ -76,7 +76,9 @@ class Node : public cSimpleModule
         void incrementSequenceNo();
         int incrementWindowNo(int number);
         bool checkSeqBetween(int start,int end,int seq);
+        bool checkSeqBetween2(int start,int end,int seq);
         bool checkCoordinator(MyCustomMsg_Base* msg);
+        void printBuffer();
 };
 
 #endif
