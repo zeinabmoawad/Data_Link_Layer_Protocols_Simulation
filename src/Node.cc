@@ -150,6 +150,8 @@ void Node::handleMessage(cMessage *msg)
                  payload = myBuffer[mmsg->getHeader()].second;
                  identifier = myBuffer[mmsg->getHeader()].first;
                 std::cout<<"Handling error free after NACK/TIMEOUT = "<< simTime().dbl()<<" payload = "<<payload<<endl;
+                std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ 0000 ]";
+                 logStates(logs);
                  mmsg->setHeader(mmsg->getHeader());
 //                 EV << identifier << 2<< endl;
 //                 EV << payload << endl;
@@ -176,6 +178,8 @@ void Node::handleMessage(cMessage *msg)
                 payload = myBuffer[mmsg->getHeader()].second;
                 identifier = myBuffer[mmsg->getHeader()].first;
                 std::cout<<"Handling after NACK/TIMEOUT = "<< simTime().dbl()<<" payload = "<<payload<<endl;
+                std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ "+identifier+" ]";
+                logStates(logs);
                 mmsg->setHeader(mmsg->getHeader());
 //                EV << identifier << 3<< endl;
 //                EV << payload << endl;
@@ -251,6 +255,11 @@ void Node::handleNACK(MyCustomMsg_Base* msg)
     int counter = 1;
 //       EV <<"handleNACK"<<endl;
 //    currentWindowIndex = msg->getHeader();
+    int frame = msg->getAck_Nack_Num();
+    while(startWindowIndex!=frame){
+        startWindowIndex = incrementWindowNo(startWindowIndex);
+        endWindowIndex = incrementWindowNo(endWindowIndex);
+    }
     std::cout<<"I am handling nack at time = "<<simTime().dbl()<<endl;
     MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
     selfMessage->setKind(2);
@@ -344,7 +353,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                     msg->setFrame_Type(0);
                     sendDelayed(msg, TD+PT,"out");
                     EV << "Receiver: error in frame no"<< seqNumToReceive<<endl;
-                    std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
+                    std::string logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
                                                   std::to_string(seqNumToReceive)+"] , loss [No]";
                     logStates(logs);
                     lastNACKedFrame = seqNumToReceive;
@@ -353,7 +362,7 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                 {
                     std::cout<<"********************************************************"<<endl;
                     EV << "Receiver: error in frame no and NACK is Lost"<< seqNumToReceive<<endl;
-                    std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
+                    std::string logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
                                                   std::to_string(seqNumToReceive)+"] , loss [Yes]";
                     logStates(logs);
                     lastNACKedFrame = seqNumToReceive;
@@ -376,25 +385,26 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
                 msg->setAck_Nack_Num(seqNumToReceive);
                 sendDelayed(msg, TD+PT,"out");
                 EV << "Receiver: message received "<< payload<<endl;
-
+                std::string logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
+                logStates(logs);
                 // print payload
-                std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
+                logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
                                                           std::to_string(seqNumToReceive)+"] , loss [No]";
                 logStates(logs);
                 // print payload
-                logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
-                logStates(logs);
+
                 lastNACKedFrame = -1;
             }
             else
             {
                 std::cout<<"********************************************************"<<endl;
-                std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
+                std::string logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
+                logStates(logs);
+                logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
                                                                           std::to_string(seqNumToReceive)+"] , loss [Yes]";
                 logStates(logs);
                 // print payload
-                logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
-                logStates(logs);
+
             }
             return;
         }
@@ -406,9 +416,9 @@ void Node::receivePacket(MyCustomMsg_Base* msg)
 //        EV << "Receiver: resnd ack "<<endl;
 
         // print payload
-        std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Resending [ACK] with number ["+
-                                                  std::to_string(seqNumToReceive)+"] , loss [No]";
-        logStates(logs);
+//        std::string logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Resending [ACK] with number ["+
+//                                                  std::to_string(seqNumToReceive)+"] , loss [No]";
+//        logStates(logs);
 }
 std::string Node::Modification(std::string message, int& errorBit)
 {
@@ -435,13 +445,14 @@ std::string Node::Framing(std::string message)
     std::string frame ="";
     for(int i=0;i<message.size();i++)
     {
-        if(message[i] == '\\' || message[i] == '$')
+        if(message[i] == '/' || message[i] == '$')
         {
-           frame += '\\';
+           frame += '/';
         }
         frame += message[i];
     }
     frame = "$" + frame + "$";
+    std::cout<<"In framing = "<<frame<<endl;
     return frame;
 }
 std::bitset<8> Node::Checksum(std::string frame)
@@ -464,11 +475,15 @@ std::bitset<8> Node::Checksum(std::string frame)
 std::string Node::Deframing(std::string frame)
 {
     std::string payload;
-//    std::cout<<"Frame = "<<frame<<endl;
+    std::cout<<"Frame = "<<frame<<endl;
     for(int i=1;i<frame.size()-1;i++)
     {
-        if(frame[i] == '\\')
-            continue;
+        std::cout<<frame[i]<<endl;
+        std::cout<<"Before condition"<<endl;
+        if (frame[i] == '/') {
+                    std::cout << "IN frame" << std::endl;
+                    i++; // Skip these characters
+                }
         payload += frame[i];
     }
     return payload;
