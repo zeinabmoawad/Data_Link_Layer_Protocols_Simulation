@@ -34,12 +34,10 @@ void Node::initialize()
     ED = getParentModule()->par("ED");
     DD = getParentModule()->par("DD");
     LP = getParentModule()->par("LP");
-//    myBuffer = new std::pair<std::string, std::string>[WS+1];
-    myBuffer.resize(WS+1);
-    Timers.resize(WS+1);
-    endWindowIndex = WS-1;
+    myBuffer.resize(WS + 1);
+    Timers.resize(WS + 1);
+    endWindowIndex = WS - 1;
     outputFileName = "../src/output.txt";
-
 
     EV << "WS = " << WS << endl;
     EV << "TO = " << TO << endl;
@@ -54,244 +52,219 @@ void Node::handleMessage(cMessage *msg)
 {
     // TODO - Generated method body
     MyCustomMsg_Base *mmsg = check_and_cast<MyCustomMsg_Base *>(msg);
-    bool isCoordinator =checkCoordinator(mmsg);
+    bool isCoordinator = checkCoordinator(mmsg);
     std::string identifier;
     std::string payload;
+    int index = -1;
     if (isCoordinator)
     {
 
         // start sending if sender else do nothing
-        if(isSending)
+        if (isSending)
         {
 
             file = openFile("../input" + std::to_string(getIndex()) + ".txt");
             std::ifstream file(outputFileName);
-                        if (file.good()) { // Check if the file exists
-                            file.close();
-
-                            // Open the file in output mode to truncate it
-                            std::ofstream ofs(outputFileName, std::ofstream::out | std::ofstream::trunc);
-                            ofs.close();
-//                            std::cout << "File '" << outputFileName << "' exists and has been emptied." << std::endl;
-                        } else {
-//                            std::cout << "File '" << outputFileName << "' does not exist." << std::endl;
-                        }
+            // clear file
+            if (file.good())
+            { // Check if the file exists
+                file.close();
+                std::ofstream ofs(outputFileName, std::ofstream::out | std::ofstream::trunc);
+                ofs.close();
+            }
             msg->setKind(0);
-            scheduleAt(simTime()+startTime,msg);
-            std::cout<<"At the beginning at time = "<< simTime().dbl()+startTime<<endl;
+            scheduleAt(simTime() + startTime, msg);
+            EV << "hereeeeee";
         }
-
     }
     // check i am sender or receive
-    else if(isSending)
+    else if (isSending)
     {
         // sending
-        if(msg->isSelfMessage())
+        EV << " i came here";
+        if (msg->isSelfMessage())
         {
-//            printBuffer();
-//            EV << msg->getKind() << checkSeqBetween(startWindowIndex, endWindowIndex, currentWindowIndex);
-            std::cout<<"I am sender self message  startWindowIndex = " <<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<" endWindowIndex= "<<endWindowIndex<<endl;
-            if(msg->getKind() == 0 && checkSeqBetween2(startWindowIndex, endWindowIndex, currentWindowIndex))
+            MyCustomMsg_Base *send_msg = new MyCustomMsg_Base("message to be sent");
+            EV << "My type is = " << msg->getKind();
+            bool resend = false;
+            bool isSend = false;
+            if (msg->getKind() == 0 && checkToContinueReading(startWindowIndex, endWindowIndex, currentWindowIndex))
             {
-//                EV << "Node "<< getIndex() << " is sender"<<endl;
                 std::pair<std::string, std::string> line = readNextLine(file);
                 identifier = line.first;
                 payload = line.second;
                 if (identifier.empty() && payload.empty())
                 {
                     EV << "File reading is done is done";
-//                    endSimulation();
                 }
                 else
                 {
-                    MyCustomMsg_Base* send_msg = new MyCustomMsg_Base("send message");
-                    std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ "+identifier+" ]";
-                                   logStates(logs);
                     send_msg->setHeader(currentWindowIndex);
-//                    EV << identifier << endl;
-//                    EV << payload << endl;
-//                    std::cout<<"current window index reading new line "<<currentWindowIndex <<endl;
-                    std::cout<<"I am reading new msg =  " <<payload<<" seq = "<<currentWindowIndex<<endl;
                     myBuffer[currentWindowIndex] = line;
-                    std::string frame = Framing(payload);
-//                    EV << frame;
-                    std::bitset<8> parity_byte = Checksum(frame);
-                    char trailer = static_cast<char>(parity_byte.to_ulong());
-                    send_msg->setTrailer(trailer);
-                    // Switch cases on identifier
-                    checkCases(identifier,send_msg,frame);
-                    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message1");
-                    selfMessage->setKind(0);
-                    scheduleAt(simTime()+PT,selfMessage);
-                    if (Timers[currentWindowIndex] != NULL){
-                        if(Timers[currentWindowIndex]->isScheduled()) // check if timer is scheduled
-                        {
-                           cancelAndDelete(Timers[currentWindowIndex]); // delete the timer message
-                           Timers[currentWindowIndex] = NULL;
-                        }
-                    }
-//                    MyCustomMsg_Base* timeOutMsg = new MyCustomMsg_Base("time out");
-                    Timers[currentWindowIndex] = new MyCustomMsg_Base("time out");
-                    Timers[currentWindowIndex]->setKind(1);
-                    scheduleAt(simTime()+PT+TO,Timers[currentWindowIndex]);
+                    index = currentWindowIndex;
+                    resend = true;
                     incrementSequenceNo();
-                 }
+                    std::cout<<"sending at "<<simTime().dbl()<<" "<<currentWindowIndex<<endl;
+                }
             }
-            else if(msg->getKind() == 1)
+            else if (msg->getKind() == 1)
             {
-                // time out
-                std::cout<<"self msg for timeout = "<< simTime().dbl()<<endl;
-                timeOutHandling();
-                //cancelAndDelete(mmsg);
-
+                handleNack_Timeout(-1);
+                // timeOutHandling();
+                isSend = true;
+                return;
             }
-            else if(msg->getKind() == 2) // NACK
+            else if (msg->getKind() == 2) // NACK
             {
-                 payload = myBuffer[mmsg->getHeader()].second;
-                 identifier = myBuffer[mmsg->getHeader()].first;
-                std::cout<<"Handling error free after NACK/TIMEOUT = "<< simTime().dbl()<<" payload = "<<payload<<endl;
-                std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ 0000 ]";
-                 logStates(logs);
-                 mmsg->setHeader(mmsg->getHeader());
-//                 EV << identifier << 2<< endl;
-//                 EV << payload << endl;
-                 std::string frame = Framing(payload);
-//                 EV << frame;
-                 std::bitset<8> parity_byte = Checksum(frame);
-                 char trailer = static_cast<char>(parity_byte.to_ulong());
-                 mmsg->setTrailer(trailer);
-                 // Switch cases on identifier
-                 checkCases("0000",mmsg,frame);
-                 if (Timers[mmsg->getHeader()] != nullptr){
-                     if(Timers[mmsg->getHeader()]->isScheduled()) // check if timer is scheduled
-                     {
-                        cancelAndDelete(Timers[mmsg->getHeader()]); // delete the timer message
-                        Timers[mmsg->getHeader()] = NULL;
-                     }
-                 }
-                 Timers[mmsg->getHeader()] = new MyCustomMsg_Base("time out");
-                 Timers[mmsg->getHeader()]->setKind(1);
-                 scheduleAt(simTime()+PT+TO,Timers[mmsg->getHeader()]);
+                payload = myBuffer[mmsg->getHeader()].second;
+                identifier = "0000";
+                send_msg->setHeader(mmsg->getHeader());
+                index = mmsg->getHeader();
+                isSend = true;
             }
-            else if(msg->getKind() == 3) // normal case
+            else if (msg->getKind() == 3) // normal case
             {
                 payload = myBuffer[mmsg->getHeader()].second;
                 identifier = myBuffer[mmsg->getHeader()].first;
-                std::cout<<"Handling after NACK/TIMEOUT = "<< simTime().dbl()<<" payload = "<<payload<<endl;
-                std::string logs = "At time["+std::to_string(simTime().dbl()) +"], Node["+std::to_string(getIndex())+"], Introducing channel error with code = [ "+identifier+" ]";
+                send_msg->setHeader(mmsg->getHeader());
+                index = mmsg->getHeader();
+                isSend = true;
+            }
+            if (isSend || resend)
+            {
+                std::string logs = "At time[" + std::to_string(simTime().dbl()) + "], Node[" + std::to_string(getIndex()) + "], Introducing channel error with code = [ " + identifier + " ]";
+                EV << logs << endl;
                 logStates(logs);
-                mmsg->setHeader(mmsg->getHeader());
-//                EV << identifier << 3<< endl;
-//                EV << payload << endl;
                 std::string frame = Framing(payload);
-//                EV << frame;
                 std::bitset<8> parity_byte = Checksum(frame);
                 char trailer = static_cast<char>(parity_byte.to_ulong());
-                mmsg->setTrailer(trailer);
+                send_msg->setTrailer(trailer);
+                send_msg->setFrame_Type(2);
                 // Switch cases on identifier
-                checkCases(identifier,mmsg,frame);
-                if (Timers[mmsg->getHeader()] != NULL){
-                    if(Timers[mmsg->getHeader()]->isScheduled()) // check if timer is scheduled
+                checkCases(identifier, send_msg, frame);
+                if (resend)
+                {
+                    MyCustomMsg_Base *selfMessage = new MyCustomMsg_Base("self message1");
+                    selfMessage->setKind(0);
+                    scheduleAt(simTime() + PT, selfMessage);
+                }
+                if (Timers[index] != nullptr)
+                {
+                    if (Timers[index]->isScheduled()) // check if timer is scheduled
                     {
-                       cancelAndDelete(Timers[mmsg->getHeader()]); // delete the timer message
-                       Timers[mmsg->getHeader()] = NULL;
+                        cancelAndDelete(Timers[index]); // delete the timer message
+                        Timers[index] = NULL;
                     }
                 }
-                Timers[mmsg->getHeader()] = new MyCustomMsg_Base("time out");
-                Timers[mmsg->getHeader()]->setKind(1);
-                scheduleAt(simTime()+PT+TO,Timers[mmsg->getHeader()]);
+                Timers[index] = new MyCustomMsg_Base("time out");
+                Timers[index]->setKind(1);
+                scheduleAt(simTime() + PT + TO, Timers[index]);
+
+
             }
-            return;
         }
-        else{
-            std::cout<<"I am sender NOT SELF MSG handle ack/nack at = "<<simTime().dbl()<<" startWindowIndex = " <<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<" endWindowIndex= "<<endWindowIndex<<endl;
+        else
+        {
             // Ack/Nack
-            if(mmsg->getFrame_Type() == 1)
+            if (mmsg->getFrame_Type() == 1)
             {
                 handleACK(mmsg);
             }
-            else if(mmsg->getFrame_Type() == 0)
+            else if (mmsg->getFrame_Type() == 0)
             {
-                handleNACK(mmsg);
+                handleNack_Timeout(mmsg->getAck_Nack_Num(), true);
             }
         }
-
     }
     else
     {
-        std::cout<<"I am reciever = "<<simTime().dbl()<<endl;
         // receiving from sender message
         receivePacket(mmsg);
     }
+    //    cancelAndDelete(mmsg);
 }
-void Node::handleACK(MyCustomMsg_Base* msg)
+void Node::handleACK(MyCustomMsg_Base *msg)
 {
-    int frame_number = ((msg->getAck_Nack_Num() + WS))%(WS + 1);
-    std::cout<<"In handle ACK frame_number = "<<frame_number<<" msg->getAck_Nack_Num() = "<<msg->getAck_Nack_Num()<<endl;
-    while(checkSeqBetween(startWindowIndex, currentWindowIndex, frame_number))
+    int frame_number = ((msg->getAck_Nack_Num() + WS)) % (WS + 1);
+    std::cout<<msg->getPayload()<<"   "<<simTime().dbl()<<"  "<<frame_number<<"  "<<startWindowIndex<<"  "<<currentWindowIndex<<"  "<<checkSeqBetween(startWindowIndex, currentWindowIndex, frame_number)<<endl;
+    while (checkSeqBetween(startWindowIndex, currentWindowIndex, frame_number))
     {
-//        EV <<"handleACK"<<endl;
-        std::cout<<"In WHILE LOOP  startWindowIndex= "<<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<endl;
-
-        std::cout<<"Handling ACK at time = "<<simTime().dbl()<<" startWindowIndex = " <<startWindowIndex<<" currentWindowIndex = "<<currentWindowIndex<<" endWindowIndex= "<<endWindowIndex<<endl;
         if (Timers[startWindowIndex] != NULL)
         {
-            if(Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
+            if (Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
             {
-               EV<<"Stopped timer for frame "<<startWindowIndex<<endl; // if scheduled, cancel it
-               cancelAndDelete(Timers[startWindowIndex]); // delete the timer message
-               Timers[startWindowIndex] = NULL;
+                cancelAndDelete(Timers[startWindowIndex]); // delete the timer message
+                Timers[startWindowIndex] = NULL;
             }
         }
+//        myBuffer[startWindowIndex] = std::make_pair("-1","-1");
         startWindowIndex = incrementWindowNo(startWindowIndex);
         endWindowIndex = incrementWindowNo(endWindowIndex);
     }
-    MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message");
+    std::cout<<"At the end  "<<startWindowIndex<<"  "<<currentWindowIndex<<"  "<<endWindowIndex<<endl;
+    MyCustomMsg_Base *selfMessage2 = new MyCustomMsg_Base("self message");
     selfMessage2->setKind(0);
-    scheduleAt(simTime(),selfMessage2);
+    scheduleAt(simTime(), selfMessage2);
 }
-void Node::handleNACK(MyCustomMsg_Base* msg)
+
+void Node::handleNack_Timeout(int frameNum, bool isNack)
 {
     int counter = 1;
-//       EV <<"handleNACK"<<endl;
-//    currentWindowIndex = msg->getHeader();
-    int frame = msg->getAck_Nack_Num();
-    while(startWindowIndex!=frame){
-        startWindowIndex = incrementWindowNo(startWindowIndex);
-        endWindowIndex = incrementWindowNo(endWindowIndex);
+    if (isNack)
+    {
+        while (startWindowIndex != frameNum)
+        {
+            if (Timers[startWindowIndex] != NULL)
+            {
+                if (Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
+                {
+                    cancelAndDelete(Timers[startWindowIndex]); // delete the timer message
+                    Timers[startWindowIndex] = NULL;
+                }
+            }
+            startWindowIndex = incrementWindowNo(startWindowIndex);
+            endWindowIndex = incrementWindowNo(endWindowIndex);
+        }
     }
-    std::cout<<"I am handling nack at time = "<<simTime().dbl()<<endl;
-    MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
+    else
+    {
+        std::string logs = "Time out event at time [ " + std::to_string(simTime().dbl()) + " ], at Node[ " + std::to_string(getIndex()) + " ] for frame with seq_num=[ " + std::to_string(startWindowIndex) + " ]";
+        EV << logs << endl;
+        logStates(logs);
+    }
+    MyCustomMsg_Base *selfMessage = new MyCustomMsg_Base("handling NACK/Timeout");
     selfMessage->setKind(2);
     selfMessage->setHeader(startWindowIndex);
-    scheduleAt(simTime()+0.001,selfMessage);
-    if (Timers[startWindowIndex] != NULL){
-        if(Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
-         {
-           cancelAndDelete(Timers[startWindowIndex]);
-           Timers[startWindowIndex] = NULL;
-         }
+    scheduleAt(simTime() + 0.001, selfMessage);
+    if (Timers[startWindowIndex] != NULL)
+    {
+        if (Timers[startWindowIndex]->isScheduled()) // check if timer is scheduled
+        {
+            cancelAndDelete(Timers[startWindowIndex]);
+            Timers[startWindowIndex] = NULL;
+        }
     }
     int index = incrementWindowNo(startWindowIndex);
-    while(index!=currentWindowIndex)
+    while (index != currentWindowIndex)
     {
-        MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base("self message");
+        MyCustomMsg_Base *selfMessage = new MyCustomMsg_Base("shandling NACK/Timeout");
         selfMessage->setKind(3);
         selfMessage->setHeader(index);
-        scheduleAt(simTime()+counter*PT+0.001,selfMessage);
-        if (Timers[index] != nullptr){
-            if(Timers[index]->isScheduled()) // check if timer is scheduled
-             {
+        scheduleAt(simTime() + counter * PT + 0.001, selfMessage);
+        if (Timers[index] != nullptr)
+        {
+            if (Timers[index]->isScheduled()) // check if timer is scheduled
+            {
                 cancelAndDelete(Timers[index]);
                 Timers[index] = NULL;
-             }
+            }
         }
         index = incrementWindowNo(index);
         counter++;
     }
-    MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message");
+    MyCustomMsg_Base *selfMessage2 = new MyCustomMsg_Base("self message to continue reading the file");
     selfMessage2->setKind(0);
-    scheduleAt(simTime()+counter*PT+0.001,selfMessage2);
+    scheduleAt(simTime() + counter * PT + 0.001, selfMessage2);
 }
 std::ifstream Node::openFile(const std::string &fileName)
 {
@@ -302,7 +275,7 @@ std::ifstream Node::openFile(const std::string &fileName)
     }
     return file;
 }
-std::pair<std::string, std::string> Node::readNextLine(std::ifstream & file)
+std::pair<std::string, std::string> Node::readNextLine(std::ifstream &file)
 {
     std::string line;
     if (std::getline(file, line))
@@ -319,152 +292,126 @@ std::pair<std::string, std::string> Node::readNextLine(std::ifstream & file)
     {
         return std::make_pair("", "");
     }
-
 }
-void Node::receivePacket(MyCustomMsg_Base* msg)
+void Node::receivePacket(MyCustomMsg_Base *msg)
 {
-    // check if seq no is expected to have
-    // if true check message if there is error
-    //      if error then send Nack
-    //      else send ack
-    // else do not respond with message
-    double random = uniform(0,1);
-//    std::cout<<"random =  "<<random<<endl;
-    bool lostACK = random<LP? true:false;
-    std::cout<<"I am in recieve packet at time = "<<simTime().dbl()<<" Loss = "<<lostACK<<endl;
+    double random = uniform(0, 1);
+    bool lostACK = random < LP ? true : false;
+    MyCustomMsg_Base *mmsg = new MyCustomMsg_Base("Receiver sent");
+    std::cout<<simTime().dbl()<<"  seq expected = "<<seqNumToReceive<<" msg->getHeader() "<<msg->getHeader()<<"  "<<lostACK<<endl;
+    mmsg->setPayload(msg->getPayload());
     if (seqNumToReceive == msg->getHeader())
     {
         // receiving from sender message
         std::string frame = msg->getPayload(); // message.getpayload
-        char trailer = msg->getTrailer(); // message.gettrailer
-//        std::cout << "Frame in reciever = "<<frame<<endl;
+        char trailer = msg->getTrailer();      // message.gettrailer
         bool errored_frame = ErrorDetection(frame, trailer);
-        std::cout<<"I am the expected packet to receive= "<<seqNumToReceive<<" error frame = "<<errored_frame<<endl;
+        std::string payload;
+        int previousSeqNum;
+        bool trial = true;
+        std::cout<<errored_frame<<endl;
         if (errored_frame)
         {
-            std::cout<<"Will I send NACK lastNACKedFrame= "<<lastNACKedFrame<<endl;
-            if(lastNACKedFrame != seqNumToReceive)
+            if (lastNACKedFrame != seqNumToReceive)
             {
                 // send Nack to sender with same header with probability LP
-                std::cout<<"Frame recieved = "<<frame<<endl;
-                if(!lostACK)
+                if (!lostACK)
                 {
-                    msg->setAck_Nack_Num(seqNumToReceive);
-                    msg->setFrame_Type(0);
-                    sendDelayed(msg, TD+PT,"out");
-                    EV << "Receiver: error in frame no"<< seqNumToReceive<<endl;
-                    std::string logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
-                                                  std::to_string(seqNumToReceive)+"] , loss [No]";
-                    logStates(logs);
+                    mmsg->setAck_Nack_Num(seqNumToReceive);
+                    mmsg->setFrame_Type(0);
+                    sendDelayed(mmsg, TD + PT, "out");
                     lastNACKedFrame = seqNumToReceive;
+                    std::cout<<msg->getPayload()<<"   i didnt send anything"<<endl;
                 }
                 else
                 {
-                    std::cout<<"********************************************************"<<endl;
-                    EV << "Receiver: error in frame no and NACK is Lost"<< seqNumToReceive<<endl;
-                    std::string logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [NACK] with number ["+
-                                                  std::to_string(seqNumToReceive)+"] , loss [Yes]";
-                    logStates(logs);
                     lastNACKedFrame = seqNumToReceive;
                 }
-               return;
             }
+            else
+                trial = false;
         }
         else
         {
-            int previousSeqNum  = seqNumToReceive;
-//            std::cout <<"seqNumToReceive= " << seqNumToReceive << "WS = " << WS << endl;
+            previousSeqNum = seqNumToReceive;
             seqNumToReceive = incrementWindowNo(seqNumToReceive);
-//            std::cout <<"seqNumToReceive= " << seqNumToReceive << endl;
-            std::string payload = Deframing(frame);
-            std::cout<<"I am the expected packet to receive= "<<seqNumToReceive<<" payload = "<<payload<<" sending ack"<<endl;
+            payload = Deframing(frame);
 
-            if(!lostACK)
+            if (!lostACK)
             {
-                msg->setFrame_Type(1);
-                msg->setAck_Nack_Num(seqNumToReceive);
-                sendDelayed(msg, TD+PT,"out");
-                EV << "Receiver: message received "<< payload<<endl;
-                std::string logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
-                logStates(logs);
-                // print payload
-                logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
-                                                          std::to_string(seqNumToReceive)+"] , loss [No]";
-                logStates(logs);
-                // print payload
-
+                std::cout<<"AT time   =  "<<simTime().dbl()<<"  "<<!lostACK<<endl;
+                mmsg->setFrame_Type(1);
+                mmsg->setAck_Nack_Num(seqNumToReceive);
+                sendDelayed(mmsg, TD + PT, "out");
                 lastNACKedFrame = -1;
             }
-            else
+            std::cout<<"AT time   =  "<<simTime().dbl()<<"  "<<!lostACK<<endl;
+        }
+        if (trial)
+        {
+            if (!errored_frame)
             {
-                std::cout<<"********************************************************"<<endl;
-                std::string logs = "Uploading payload=["+payload+"] and seq_num =["+std::to_string(previousSeqNum)+"] to the network layer";
+                std::string logs = "Uploading payload=[" + payload + "] and seq_num =[" + std::to_string(previousSeqNum) + "] to the network layer";
+                EV << logs << endl;
                 logStates(logs);
-                logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Sending [ACK] with number ["+
-                                                                          std::to_string(seqNumToReceive)+"] , loss [Yes]";
-                logStates(logs);
-                // print payload
-
             }
+            std::string logs = "At time[" + std::to_string(PT + simTime().dbl()) + "], Node[" + std::to_string(getIndex()) + "] Sending [" +
+                               ((errored_frame) ? "NACK" : "ACK") + "] with number [" +
+                               std::to_string(seqNumToReceive) + "] , loss [" +
+                               ((!lostACK) ? "No" : "Yes") + "]";
+            EV << logs << endl;
+            logStates(logs);
             return;
         }
     }
-    std::cout<<"I am not the expected packet to receive= "<<seqNumToReceive<<" while it came= "<<msg->getHeader()<<" payload = "<<msg->getPayload()<<" resesending ack"<<endl;
-        msg->setFrame_Type(1);
-        msg->setAck_Nack_Num(seqNumToReceive);
-        sendDelayed(msg, TD+PT,"out");
-//        EV << "Receiver: resnd ack "<<endl;
-
-        // print payload
-//        std::string logs = "At time["+std::to_string(PT+simTime().dbl()) +"], Node["+std::to_string(getIndex())+"] Resending [ACK] with number ["+
-//                                                  std::to_string(seqNumToReceive)+"] , loss [No]";
-//        logStates(logs);
+    mmsg->setFrame_Type(1);
+    mmsg->setAck_Nack_Num(seqNumToReceive);
+    sendDelayed(mmsg, TD + PT, "out");
 }
-std::string Node::Modification(std::string message, int& errorBit)
+std::string Node::Modification(std::string message, int &errorBit)
 {
     int message_length = message.size();
-    std::vector<std::bitset<8> >message_bit_stream;
-    for(int i=0; i<message_length;i++)
+    std::vector<std::bitset<8>> message_bit_stream;
+    for (int i = 0; i < message_length; i++)
     {
         std::bitset<8> bit_message(message[i]);
         message_bit_stream.push_back(bit_message);
     }
-    errorBit = int(uniform(0, message.size()*8));
-    int errorChar = errorBit/8;
-    message_bit_stream[errorChar][errorBit%8] = !message_bit_stream[errorChar][errorBit%8];
+    errorBit = int(uniform(0, message.size() * 8));
+    int errorChar = errorBit / 8;
+    message_bit_stream[errorChar][errorBit % 8] = !message_bit_stream[errorChar][errorBit % 8];
     std::string errored_message = "";
-    for(std::vector<std::bitset<8> >::iterator it = message_bit_stream.begin(); it != message_bit_stream.end(); ++it)
+    for (std::vector<std::bitset<8>>::iterator it = message_bit_stream.begin(); it != message_bit_stream.end(); ++it)
     {
-        errored_message +=(char)(*it).to_ulong();
+        errored_message += (char)(*it).to_ulong();
     }
 
     return errored_message;
 }
 std::string Node::Framing(std::string message)
 {
-    std::string frame ="";
-    for(int i=0;i<message.size();i++)
+    std::string frame = "";
+    for (int i = 0; i < message.size(); i++)
     {
-        if(message[i] == '/' || message[i] == '$')
+        if (message[i] == '/' || message[i] == '$')
         {
-           frame += '/';
+            frame += '/';
         }
         frame += message[i];
     }
     frame = "$" + frame + "$";
-    std::cout<<"In framing = "<<frame<<endl;
     return frame;
 }
 std::bitset<8> Node::Checksum(std::string frame)
 {
     int checksum = 0;
     int frame_int;
-    for(int i=0;i<frame.size();i++)
+    for (int i = 0; i < frame.size(); i++)
     {
         std::bitset<8> frame_byte(frame[i]);
         frame_int = (frame_byte).to_ulong();
         checksum += frame_int;
-        if(checksum > 255)
+        if (checksum > 255)
         {
             checksum = checksum - 256 + 1;
         }
@@ -475,15 +422,12 @@ std::bitset<8> Node::Checksum(std::string frame)
 std::string Node::Deframing(std::string frame)
 {
     std::string payload;
-    std::cout<<"Frame = "<<frame<<endl;
-    for(int i=1;i<frame.size()-1;i++)
+    for (int i = 1; i < frame.size() - 1; i++)
     {
-        std::cout<<frame[i]<<endl;
-        std::cout<<"Before condition"<<endl;
-        if (frame[i] == '/') {
-                    std::cout << "IN frame" << std::endl;
-                    i++; // Skip these characters
-                }
+        if (frame[i] == '/')
+        {
+            i++; // Skip these characters
+        }
         payload += frame[i];
     }
     return payload;
@@ -492,44 +436,8 @@ bool Node::ErrorDetection(std::string frame, char parity_byte)
 {
     return Checksum(frame) != std::bitset<8>(parity_byte);
 }
-void Node::timeOutHandling()
-{
-    int counter = 1;
-//    EV <<"timeOutHandling"<<endl;
-    std::string myMessage = "timeout for message" + myBuffer[startWindowIndex].second;
-   MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base(myMessage.c_str());
-   selfMessage->setKind(2);
-   selfMessage->setHeader(startWindowIndex);
-   Timers[startWindowIndex] = NULL;
-   scheduleAt(simTime(),selfMessage);
-   int index = incrementWindowNo(startWindowIndex);
-   std::string log = "Time out event at time [ "+std::to_string(simTime().dbl())+" ], at Node[ "+std::to_string(getIndex())+" ] for frame with seq_num=[ "+std::to_string(startWindowIndex)+" ]";
-   logStates(log);
-   while(index!=currentWindowIndex)
-   {
-       myMessage = "timeout for message" + myBuffer[index].second;
-       MyCustomMsg_Base* selfMessage = new MyCustomMsg_Base(myMessage.c_str());
-       selfMessage->setKind(3);
-       selfMessage->setHeader(index);
-       scheduleAt(simTime()+counter*PT,selfMessage);
-       if (Timers[index] != nullptr){
-           if(Timers[index]->isScheduled()) // check if timer is scheduled
-            {
-               cancelAndDelete(Timers[index]);
-               Timers[index] = NULL;
-            }
-       }
-       counter++;
-       index = incrementWindowNo(index);
-//       std::cout<<"index " <<index<<endl;
-   }
-   MyCustomMsg_Base* selfMessage2 = new MyCustomMsg_Base("self message after timeoutHandling to continue reading the file");
-   selfMessage2->setKind(0);
-   scheduleAt(simTime()+counter*PT,selfMessage2);
-}
 
-
-void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::string frame)
+void Node::checkCases(const std::string &identifier, MyCustomMsg_Base *msg, std::string frame)
 {
     unsigned int inputValue = std::bitset<4>(identifier).to_ulong();
     std::string modified_frame;
@@ -537,151 +445,161 @@ void Node::checkCases(const std::string& identifier,MyCustomMsg_Base* msg,std::s
     // Switch-case logic based on the input value
 
     bool isModified = false;
-        bool isLoss = false;
-        bool isDuplicate = false;
-        bool isDelayed = false;
-        int errorBit;
+    bool isLoss = false;
+    bool isDuplicate = false;
+    bool isDelayed = false;
+    int errorBit;
+    msg->setPayload(frame.c_str());
+    switch (inputValue)
+    {
+    case 0b0000:
         msg->setPayload(frame.c_str());
-        switch (inputValue) {
-            case 0b0000:
-                msg->setPayload(frame.c_str());
-                sendDelayed(msg, PT+TD,"out");
-                break;
-            case 0b0001: //delay
-                isDelayed = true;
-                msg->setPayload(frame.c_str());
-                sendDelayed(msg, PT+TD+ED, "out");
-                break;
-            case 0b0010: //isDuplicate
-                isDuplicate = true;
-                msg->setPayload(frame.c_str());
-                sendDelayed(msg, PT+TD, "out");
-                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD, "out");
-                break;
-            case 0b0011: //duplicate,delay
-                isDuplicate = true;
-                isDelayed = true;
-                msg->setPayload(frame.c_str());
-                sendDelayed(msg, PT+TD+ED, "out");
-                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD+ED, "out");
-                break;
-            case 0b0100: // loss
-                isLoss = true;
-                break;
-            case 0b0101://loss,delay
-                isLoss = true;
-                isDelayed = true;
-                break;
-            case 0b0110://loss,duplicate
-                isDuplicate = true;
-                isLoss = true;
-                break;
-            case 0b0111://loss,duplicate,delay
-                isDuplicate = true;
-                isLoss = true;
-                isDelayed = true;
-                break;
-            case 0b1000:
-                isModified = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                sendDelayed(msg, PT+TD, "out");
-                break;
-            case 0b1001:
-                isModified = true;
-                isDelayed = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                sendDelayed(msg, PT+TD+ED, "out");
-                break;
-            case 0b1010:
-                isModified = true;
-                isDuplicate = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                sendDelayed(msg, PT+TD, "out");
-                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD, "out");
-                break;
-            case 0b1011: // Mod, dup,delay
-                isModified = true;
-                isDuplicate = true;
-                isDelayed = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                sendDelayed(msg, PT+TD+ED, "out");
-                sendDelayed(new MyCustomMsg_Base(*msg), PT+TD+DD+ED, "out");
-                break;
-            case 0b1100: // loss, mod
-                isModified = true;
-                isLoss = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                break;
-            case 0b1101: // loss, mod, delay
-                isModified = true;
-                isDelayed = true;
-                isLoss = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                break;
-            case 0b1110: // loss, mod, dup
-                isModified = true;
-                isDuplicate = true;
-                isLoss = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                break;
-            case 0b1111: // loss, mod, dup, delay
-                isModified = true;
-                isDuplicate = true;
-                isDelayed = true;
-                isLoss = true;
-                modified_frame = Modification(frame,errorBit);
-                msg->setPayload(modified_frame.c_str());
-                break;
+        sendDelayed(msg, PT + TD, "out");
+        break;
+    case 0b0001: // delay
+        isDelayed = true;
+        msg->setPayload(frame.c_str());
+        sendDelayed(msg, PT + TD + ED, "out");
+        break;
+    case 0b0010: // isDuplicate
+        isDuplicate = true;
+        msg->setPayload(frame.c_str());
+        sendDelayed(msg, PT + TD, "out");
+        sendDelayed(new MyCustomMsg_Base(*msg), PT + TD + DD, "out");
+        break;
+    case 0b0011: // duplicate,delay
+        isDuplicate = true;
+        isDelayed = true;
+        msg->setPayload(frame.c_str());
+        sendDelayed(msg, PT + TD + ED, "out");
+        sendDelayed(new MyCustomMsg_Base(*msg), PT + TD + DD + ED, "out");
+        break;
+    case 0b0100: // loss
+        isLoss = true;
+        break;
+    case 0b0101: // loss,delay
+        isLoss = true;
+        isDelayed = true;
+        break;
+    case 0b0110: // loss,duplicate
+        isDuplicate = true;
+        isLoss = true;
+        break;
+    case 0b0111: // loss,duplicate,delay
+        isDuplicate = true;
+        isLoss = true;
+        isDelayed = true;
+        break;
+    case 0b1000:
+        isModified = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        sendDelayed(msg, PT + TD, "out");
+        break;
+    case 0b1001:
+        isModified = true;
+        isDelayed = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        sendDelayed(msg, PT + TD + ED, "out");
+        break;
+    case 0b1010:
+        isModified = true;
+        isDuplicate = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        sendDelayed(msg, PT + TD, "out");
+        sendDelayed(new MyCustomMsg_Base(*msg), PT + TD + DD, "out");
+        break;
+    case 0b1011: // Mod, dup,delay
+        isModified = true;
+        isDuplicate = true;
+        isDelayed = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        sendDelayed(msg, PT + TD + ED, "out");
+        sendDelayed(new MyCustomMsg_Base(*msg), PT + TD + DD + ED, "out");
+        break;
+    case 0b1100: // loss, mod
+        isModified = true;
+        isLoss = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        break;
+    case 0b1101: // loss, mod, delay
+        isModified = true;
+        isDelayed = true;
+        isLoss = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        break;
+    case 0b1110: // loss, mod, dup
+        isModified = true;
+        isDuplicate = true;
+        isLoss = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        break;
+    case 0b1111: // loss, mod, dup, delay
+        isModified = true;
+        isDuplicate = true;
+        isDelayed = true;
+        isLoss = true;
+        modified_frame = Modification(frame, errorBit);
+        msg->setPayload(modified_frame.c_str());
+        break;
 
-            default: break;
-        }
-        logs = "At time [ " + std::to_string((simTime() + PT).dbl()) + " ], Node[ " + std::to_string(getIndex()) + " ]"
-            " [sent] frame with seq_num=[" + std::to_string(msg->getHeader()) + "] and payload=[ " + msg->getPayload() + " ] "
-            "and trailer=[ " + std::bitset<8>(msg->getTrailer()).to_string() + " ] , Modified [ " + ((isModified) ? std::to_string(errorBit) : "-1") + " ]"
-            " , Lost[ " + ((isLoss) ? "Yes" : "No") + " ], Duplicate [ " + ((isDuplicate) ? "1" : "0") + " ],"
-            " Delay [ " + ((isDelayed) ? std::to_string(ED) : "0") + " ]";
-        logStates(logs);
-        if(isDuplicate)
-        {
-            logs = "At time [ " + std::to_string((simTime() + PT + DD).dbl()) + " ], Node[ " + std::to_string(getIndex()) + " ]"
-                        " [sent] frame with seq_num=[" + std::to_string(msg->getHeader()) + "] and payload=[ " + msg->getPayload() + " ] "
-                        "and trailer=[ " + std::bitset<8>(msg->getTrailer()).to_string() + " ] , Modified [ " + ((isModified) ? std::to_string(errorBit) : "-1") + " ]"
-                        " , Lost[ " + ((isLoss) ? "Yes" : "No") + " ], Duplicate [ 2 ],"
-                        " Delay [ " + ((isDelayed) ? std::to_string(ED) : "0") + " ]";
-                    logStates(logs);
-        }
+    default:
+        break;
     }
-
+    logs = "At time [ " + std::to_string((simTime() + PT).dbl()) + " ], Node[ " + std::to_string(getIndex()) + " ]"
+                                                                                                               " [sent] frame with seq_num=[" +
+           std::to_string(msg->getHeader()) + "] and payload=[ " + msg->getPayload() + " ] "
+                                                                                       "and trailer=[ " +
+           std::bitset<8>(msg->getTrailer()).to_string() + " ] , Modified [ " + ((isModified) ? std::to_string(errorBit) : "-1") + " ]"
+                                                                                                                                   " , Lost[ " +
+           ((isLoss) ? "Yes" : "No") + " ], Duplicate [ " + ((isDuplicate) ? "1" : "0") + " ],"
+                                                                                          " Delay [ " +
+           ((isDelayed) ? std::to_string(ED) : "0") + " ]";
+    EV << logs << endl;
+    logStates(logs);
+    if (isDuplicate)
+    {
+        logs = "At time [ " + std::to_string((simTime() + PT + DD).dbl()) + " ], Node[ " + std::to_string(getIndex()) + " ]"
+                                                                                                                        " [sent] frame with seq_num=[" +
+               std::to_string(msg->getHeader()) + "] and payload=[ " + msg->getPayload() + " ] "
+                                                                                           "and trailer=[ " +
+               std::bitset<8>(msg->getTrailer()).to_string() + " ] , Modified [ " + ((isModified) ? std::to_string(errorBit) : "-1") + " ]"
+                                                                                                                                       " , Lost[ " +
+               ((isLoss) ? "Yes" : "No") + " ], Duplicate [ 2 ],"
+                                           " Delay [ " +
+               ((isDelayed) ? std::to_string(ED) : "0") + " ]";
+        logStates(logs);
+        EV << logs << endl;
+    }
+}
 
 void Node::logStates(std::string logs)
 {
     // Open the file in append mode
-        std::ofstream outputFile(outputFileName, std::ios::app);
+    std::ofstream outputFile(outputFileName, std::ios::app);
 
-        // Check if the file is successfully opened
-        if (!outputFile.is_open()) {
-            std::cerr << "Error opening the file!" << std::endl;
-        }
+    // Check if the file is successfully opened
+    if (!outputFile.is_open())
+    {
+        std::cerr << "Error opening the file!" << std::endl;
+    }
 
-        outputFile << logs << std::endl;
+    outputFile << logs << std::endl;
 
-        // Close the file
-        outputFile.close();
-
-//        std::cout << "String appended to the file successfully." << std::endl;
+    // Close the file
+    outputFile.close();
 }
 void Node::incrementSequenceNo()
 {
-    if (currentWindowIndex+1 > WS)
+    if (currentWindowIndex + 1 > WS)
     {
-        currentWindowIndex =0;
+        currentWindowIndex = 0;
     }
     else
     {
@@ -690,7 +608,7 @@ void Node::incrementSequenceNo()
 }
 int Node::incrementWindowNo(int number)
 {
-    if (number+1 > WS)
+    if (number + 1 > WS)
     {
         number = 0;
     }
@@ -700,11 +618,10 @@ int Node::incrementWindowNo(int number)
     }
     return number;
 }
-bool Node::checkSeqBetween(int start,int end,int seq)
+bool Node::checkSeqBetween(int start, int end, int seq)
 {
-    EV <<endl<< " start = " << start << " end = " <<end<<" frame = "<<seq<<endl;
-    if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq)) // start<= seq 2 are deleted
-            || ((seq < end )&& (end < start)))
+    if (((start <= seq) && (seq < end)) || ((end < start) && (start <= seq)) // start<= seq 2 are deleted
+        || ((seq < end) && (end < start)))
     {
         return true;
     }
@@ -713,11 +630,10 @@ bool Node::checkSeqBetween(int start,int end,int seq)
         return false;
     }
 }
-bool Node::checkSeqBetween2(int start,int end,int seq)
+bool Node::checkToContinueReading(int start, int end, int seq)
 {
-    EV <<endl<< " start = " << start << " end = " <<end<<" frame = "<<seq<<endl;
-    if( ((start<= seq )&& (seq < end)) || ((end < start )&& (start <= seq)) // start<= seq 2 are deleted
-            || ((seq < end )&& (end < start)) || (seq == end))
+    if (((start <= seq) && (seq < end)) || ((end < start) && (start <= seq)) // start<= seq 2 are deleted
+        || ((seq < end) && (end < start)) || (seq == end))
     {
         return true;
     }
@@ -726,42 +642,28 @@ bool Node::checkSeqBetween2(int start,int end,int seq)
         return false;
     }
 }
-bool Node::checkCoordinator(MyCustomMsg_Base* msg)
+bool Node::checkCoordinator(MyCustomMsg_Base *msg)
 {
     int senderID = msg->getSenderModuleId();
     // check if coordinator ssending
-    if (senderID ==2)
+    EV << "i am in checkCoordinator";
+    if (senderID == 2)
     {
         // coordinator sending
-        EV << "coordinator sending "<<endl;
         int nodeSending = msg->getAck_Nack_Num();
-        if(nodeSending == getIndex())
+        if (nodeSending == getIndex())
         {
             // sender
             isSending = true;
             startTime = atoi(msg->getPayload());
-            EV << "Node "<< getIndex() << " is sender"<<endl;
-            EV << "sending at time: "<<startTime<<endl;
-
             // set parameter of sender;
+            EV << "iam " << getIndex() << " " << startTime << endl;
         }
         else
         {
             isSending = false;
-            EV << "Node "<< getIndex() << " is receiver"<<endl;
-            // set parameter of receiver
-            //WS = 1;
-
         }
         return true;
     }
     return false;
 }
-
-void Node::printBuffer()
-{
-   EV<<"startWindowIndex = "<<myBuffer[startWindowIndex].second<<endl;
-   EV<<"currentWindowIndex = "<<myBuffer[currentWindowIndex].second<<endl;
-   EV<<"endWindowIndex = "<<myBuffer[endWindowIndex].second<<endl;
-}
-
